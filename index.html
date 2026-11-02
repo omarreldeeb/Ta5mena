@@ -24,8 +24,8 @@
           <span>ROOM</span>
           <strong id="header-room-code">----</strong>
         </div>
-        <button id="btn-config-toggle" class="btn btn-sm" title="Database Configuration" aria-label="Database Configuration">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <button id="btn-header-my-list" class="btn btn-sm btn-my-list hidden">
+          MY LIST
         </button>
       </div>
     </header>
@@ -378,30 +378,27 @@
     </section>
 
     <!-- ===================================================================== -->
-    <!-- CONFIGURATION MODAL (FIREBASE REALTIME DB CREDENTIALS) -->
+    <!-- MY LIST OVERLAY / DRAWER -->
     <!-- ===================================================================== -->
-    <div id="modal-config" class="modal-backdrop">
-      <div class="config-modal-box">
-        <div class="flex-between">
-          <span style="font-size: 13px; font-weight: 800; font-family: var(--font-mono);">FIREBASE DATABASE SETUP</span>
-          <button id="btn-close-config" class="btn btn-sm">Close</button>
+    <div id="modal-my-list" class="modal-backdrop">
+      <div class="confirm-modal-box" style="max-width: 480px;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge badge-accent">PRIVATE</span>
+            <span style="font-size: 14px; font-weight: 800; font-family: var(--font-mono);">MY TOP 10 LIST</span>
+          </div>
+          <button id="btn-close-my-list" class="btn btn-sm">Close</button>
         </div>
 
-        <p class="text-secondary" style="font-size: 13px;">
-          Ta5mena connects to Firebase Realtime Database. You can paste your Firebase config JSON below or use the default embedded configuration.
-        </p>
-
-        <textarea id="textarea-firebase-config" placeholder='{\n  "apiKey": "...",\n  "databaseURL": "https://...",\n  "projectId": "..."\n}'></textarea>
-
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-          Ensure Realtime Database rules allow read/write in test mode:<br>
-          <code class="mono" style="color: var(--accent);">{ ".read": true, ".write": true }</code>
+        <div style="font-size: 12px; color: var(--text-secondary);">
+          Review your 10 rankings. Slots guessed by opponents are marked in green.
         </div>
 
-        <div class="flex-between gap-8">
-          <button id="btn-reset-config" class="btn btn-sm">Reset to Default</button>
-          <button id="btn-save-config" class="btn btn-primary btn-sm">Save & Connect</button>
+        <div id="my-list-drawer-slots" style="display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; padding-right: 2px;">
+          <!-- Slots rendered dynamically -->
         </div>
+
+        <button id="btn-dismiss-my-list" class="btn btn-block">Back to Game</button>
       </div>
     </div>
 

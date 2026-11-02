@@ -1100,35 +1100,47 @@ header.app-header {
   color: var(--success);
 }
 
-/* Config & Setup Modal */
-.config-modal-box {
+/* Header My List Button & Drawer */
+.btn-my-list {
+  height: 30px;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
   background-color: var(--bg-card);
-  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 20px;
-  max-width: 500px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
 
-.config-modal-box textarea {
-  width: 100%;
-  height: 140px;
+.btn-my-list:hover {
+  background-color: var(--accent);
+  color: #FFFFFF;
+}
+
+.btn-my-list.active {
+  background-color: var(--accent);
+  color: #FFFFFF;
+}
+
+.my-list-slot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
   background-color: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
   font-size: 13px;
-  padding: 10px;
-  outline: none;
-  resize: vertical;
+  gap: 8px;
 }
 
-.config-modal-box textarea:focus {
-  border-color: var(--accent);
+.my-list-slot-item.revealed {
+  border-color: var(--success);
+  background-color: rgba(0, 230, 118, 0.06);
 }
 
 /* ============================================================================

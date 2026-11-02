@@ -37,44 +37,22 @@ class DatabaseService {
     this.listeners = new Map();
     this.broadcastChannel = null;
 
-    // Use hardcoded firebaseConfig by default unless valid custom override exists
-    let activeConfig = firebaseConfig;
-    const customConfigStr = localStorage.getItem("ta5mena_firebase_config");
-    if (customConfigStr) {
-      try {
-        const parsed = JSON.parse(customConfigStr);
-        if (parsed && parsed.apiKey && parsed.apiKey !== "YOUR_API_KEY") {
-          activeConfig = parsed;
-        }
-      } catch (e) {
-        // Ignore invalid local storage item
-      }
-    }
-    this.activeConfig = activeConfig;
-
+    // Hardcoded firebaseConfig is the sole connection configuration
+    this.activeConfig = firebaseConfig;
     this.initPromise = this.initDatabase();
   }
 
   async initDatabase() {
-    const isPlaceholder = !this.activeConfig.apiKey || 
-                          this.activeConfig.apiKey === "YOUR_API_KEY" || 
-                          this.activeConfig.databaseURL.includes("YOUR_PROJECT_ID");
-
-    if (!isPlaceholder) {
-      try {
-        const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-        const { getDatabase } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-        
-        const app = getApps().length === 0 ? initializeApp(this.activeConfig) : getApp();
-        this.fbDb = getDatabase(app);
-        this.isFirebaseReady = true;
-        console.log("[Ta5mena] Connected to Firebase Realtime Database:", this.activeConfig.databaseURL);
-      } catch (err) {
-        console.warn("[Ta5mena] Firebase initialization error. Falling back to local multi-tab sync:", err);
-        this.setupLocalFallback();
-      }
-    } else {
-      console.log("[Ta5mena] Operating with Multi-Tab Local Sync.");
+    try {
+      const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getDatabase } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      
+      const app = getApps().length === 0 ? initializeApp(this.activeConfig) : getApp();
+      this.fbDb = getDatabase(app);
+      this.isFirebaseReady = true;
+      console.log("[Ta5mena] Connected to Firebase Realtime Database:", this.activeConfig.databaseURL);
+    } catch (err) {
+      console.warn("[Ta5mena] Firebase initialization error. Falling back to local multi-tab sync:", err);
       this.setupLocalFallback();
     }
   }
@@ -87,6 +65,33 @@ class DatabaseService {
         const { path, data } = event.data;
         this.triggerLocalListeners(path, data);
       };
+    }
+  }
+
+  async setupDisconnectHandler(roomCode, playerId, playerName) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      try {
+        const { ref, onDisconnect } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+        const metaRef = ref(this.fbDb, `rooms/${roomCode}/meta`);
+        onDisconnect(metaRef).update({
+          status: "aborted",
+          abortedReason: `${playerName} left or disconnected. Room closed.`
+        });
+      } catch (err) {
+        console.warn("[Ta5mena] onDisconnect setup error:", err);
+      }
+    }
+  }
+
+  async cancelDisconnectHandler(roomCode) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      try {
+        const { ref, onDisconnect } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+        const metaRef = ref(this.fbDb, `rooms/${roomCode}/meta`);
+        onDisconnect(metaRef).cancel();
+      } catch (err) {}
     }
   }
 
@@ -240,10 +245,16 @@ class GameController {
     // Header & Alert
     this.headerRoomTag = document.getElementById("header-room-tag");
     this.headerRoomCode = document.getElementById("header-room-code");
-    this.btnConfigToggle = document.getElementById("btn-config-toggle");
+    this.btnHeaderMyList = document.getElementById("btn-header-my-list");
     this.systemAlertBanner = document.getElementById("system-alert-banner");
     this.systemAlertText = document.getElementById("system-alert-text");
     this.btnCloseAlert = document.getElementById("btn-close-alert");
+
+    // My List Drawer Modal
+    this.modalMyList = document.getElementById("modal-my-list");
+    this.myListDrawerSlots = document.getElementById("my-list-drawer-slots");
+    this.btnCloseMyList = document.getElementById("btn-close-my-list");
+    this.btnDismissMyList = document.getElementById("btn-dismiss-my-list");
 
     // Home
     this.inputPlayerName = document.getElementById("input-player-name");
@@ -314,22 +325,32 @@ class GameController {
     this.btnReturnHome = document.getElementById("btn-return-home");
     this.btnPlayAgain = document.getElementById("btn-play-again");
     this.playAgainNote = document.getElementById("play-again-note");
-
-    // Config Modal
-    this.modalConfig = document.getElementById("modal-config");
-    this.textareaFirebaseConfig = document.getElementById("textarea-firebase-config");
-    this.btnCloseConfig = document.getElementById("btn-close-config");
-    this.btnResetConfig = document.getElementById("btn-reset-config");
-    this.btnSaveConfig = document.getElementById("btn-save-config");
   }
 
   bindEvents() {
     // Navigation / Alerts
     this.btnCloseAlert.addEventListener("click", () => this.hideAlert());
-    this.btnConfigToggle.addEventListener("click", () => this.openConfigModal());
-    this.btnCloseConfig.addEventListener("click", () => this.closeConfigModal());
-    this.btnSaveConfig.addEventListener("click", () => this.saveCustomConfig());
-    this.btnResetConfig.addEventListener("click", () => this.resetDefaultConfig());
+
+    // My List Drawer Toggle
+    this.btnHeaderMyList.addEventListener("click", () => this.toggleMyListDrawer());
+    this.btnCloseMyList.addEventListener("click", () => this.toggleMyListDrawer(false));
+    this.btnDismissMyList.addEventListener("click", () => this.toggleMyListDrawer(false));
+    this.modalMyList.addEventListener("click", (e) => {
+      if (e.target === this.modalMyList) {
+        this.toggleMyListDrawer(false);
+      }
+    });
+
+    // Window disconnect handler fallback
+    window.addEventListener("beforeunload", () => {
+      if (this.currentRoomCode && this.roomData && 
+          (this.roomData.meta?.status === "playing" || this.roomData.meta?.status === "entry")) {
+        db.update(`rooms/${this.currentRoomCode}/meta`, {
+          status: "aborted",
+          abortedReason: `${this.myPlayerName} left or disconnected. Room closed.`
+        });
+      }
+    });
 
     // Home
     this.btnCreateRoom.addEventListener("click", () => this.handleCreateRoom());
@@ -351,7 +372,7 @@ class GameController {
       });
     });
     this.btnStartMatch.addEventListener("click", () => this.handleStartMatch());
-    this.btnLeaveRoom.addEventListener("click", () => this.leaveRoom());
+    this.btnLeaveRoom.addEventListener("click", () => this.handleLeaveRoom());
 
     // Entry Phase
     this.btnSubmitList.addEventListener("click", () => this.handleSubmitSecretList());
@@ -577,14 +598,29 @@ class GameController {
     this.subscribeToRoom(code);
   }
 
+  async handleLeaveRoom() {
+    if (this.currentRoomCode) {
+      await db.update(`rooms/${this.currentRoomCode}/meta`, {
+        status: "aborted",
+        abortedReason: `${this.myPlayerName} left or disconnected. Room closed.`
+      });
+    }
+    this.leaveRoom();
+  }
+
   leaveRoom() {
     if (this.roomUnsubscribe) {
       this.roomUnsubscribe();
       this.roomUnsubscribe = null;
     }
+    if (this.currentRoomCode) {
+      db.cancelDisconnectHandler(this.currentRoomCode);
+    }
     this.discardSession();
     this.currentRoomCode = null;
     this.roomData = null;
+    this.btnHeaderMyList?.classList.add("hidden");
+    this.modalMyList?.classList.remove("open");
     if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
     if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
     this.switchView("home");
@@ -599,10 +635,18 @@ class GameController {
       this.roomUnsubscribe();
     }
 
-    this.roomUnsubscribe = await db.listen(`rooms/${roomCode}`, (room) => {
+    this.roomUnsubscribe = await db.listen(`rooms/${roomCode}`, async (room) => {
       if (!room) {
-        this.showAlert("Room has been closed or removed.");
         this.leaveRoom();
+        this.showAlert("Room has been closed or removed.");
+        return;
+      }
+
+      // Check aborted status flag (player left/disconnected)
+      if (room.meta && room.meta.status === "aborted") {
+        const reason = room.meta.abortedReason || "A player left or disconnected. Room closed.";
+        this.leaveRoom();
+        this.showAlert(reason);
         return;
       }
 
@@ -614,11 +658,46 @@ class GameController {
         return;
       }
 
+      // Check if any player departed during active game (playing or entry)
+      if (room.meta && (room.meta.status === "playing" || room.meta.status === "entry")) {
+        const turnOrder = room.game?.turnOrder || [];
+        const isMissingFromTurn = turnOrder.length > 0 && turnOrder.some(pid => !room.players || !room.players[pid]);
+        const currentPlayers = Object.keys(room.players || {});
+        if (isMissingFromTurn || currentPlayers.length < 2) {
+          await db.update(`rooms/${roomCode}/meta`, {
+            status: "aborted",
+            abortedReason: "A player left or disconnected. Room closed."
+          });
+          return;
+        }
+      }
+
       this.isHost = me.isHost || (room.meta.hostId === this.myPlayerId);
       this.category = room.meta.category || "singers";
 
+      // Setup Firebase onDisconnect handler for this player on the room
+      db.setupDisconnectHandler(roomCode, this.myPlayerId, this.myPlayerName);
+
+      this.updateMyListButtonVisibility(room);
       this.routeRoomState(room);
     });
+  }
+
+  updateMyListButtonVisibility(room) {
+    if (!room || !this.myPlayerId) {
+      this.btnHeaderMyList.classList.add("hidden");
+      return;
+    }
+    const me = room.players ? room.players[this.myPlayerId] : null;
+    const isEntryLocked = (room.meta?.status === "entry" && me && me.listSubmitted);
+    const isPlaying = (room.meta?.status === "playing");
+    const show = !!(isEntryLocked || isPlaying);
+    this.btnHeaderMyList.classList.toggle("hidden", !show);
+
+    // If modal is currently open, live update its slots
+    if (this.modalMyList.classList.contains("open")) {
+      this.renderMyListDrawer();
+    }
   }
 
   routeRoomState(room) {
@@ -737,82 +816,19 @@ class GameController {
     const room = this.roomData;
     if (!room || !room.players || !room.players[kickedPlayerId]) return;
 
-    // 1. Remove player node and list node from database
-    await db.remove(`rooms/${this.currentRoomCode}/players/${kickedPlayerId}`);
-    await db.remove(`rooms/${this.currentRoomCode}/lists/${kickedPlayerId}`);
-
-    // 2. If currently in playing phase, cleanly advance/adjust game state
-    if (room.meta && room.meta.status === "playing") {
-      const game = room.game || {};
-      const turnOrder = game.turnOrder || [];
-      const kickedIndex = turnOrder.indexOf(kickedPlayerId);
-      const newTurnOrder = turnOrder.filter(id => id !== kickedPlayerId);
-
-      let newTurnIndex = game.currentTurnIndex || 0;
-      let newActivePlayerId = game.activePlayerId;
-
-      if (newTurnOrder.length > 0) {
-        if (game.activePlayerId === kickedPlayerId) {
-          // Kicked player was active turn player: advance turn to next player in turnOrder
-          newTurnIndex = (kickedIndex >= 0 ? kickedIndex : newTurnIndex) % newTurnOrder.length;
-          newActivePlayerId = newTurnOrder[newTurnIndex];
-        } else if (kickedIndex >= 0 && kickedIndex < newTurnIndex) {
-          // Kicked player was before active player in turnOrder: decrement index
-          newTurnIndex = (newTurnIndex - 1 + newTurnOrder.length) % newTurnOrder.length;
-          newActivePlayerId = newTurnOrder[newTurnIndex];
-        } else {
-          newTurnIndex = newTurnIndex % newTurnOrder.length;
-          newActivePlayerId = newTurnOrder[newTurnIndex];
-        }
-      } else {
-        newTurnIndex = 0;
-        newActivePlayerId = null;
-      }
-
-      // Check if confirmation modal was pending involving the kicked player
-      const confirmation = game.confirmation;
-      const isConfirmationAffected = confirmation && (
-        confirmation.fromPlayerId === kickedPlayerId || 
-        confirmation.toPlayerId === kickedPlayerId
-      );
-
-      const gameUpdates = {
-        turnOrder: newTurnOrder,
-        currentTurnIndex: newTurnIndex,
-        activePlayerId: newActivePlayerId,
-        lastAction: {
-          text: `${kickedPlayerName} was removed from the match by the host.`,
-          timestamp: Date.now()
-        }
-      };
-
-      if (isConfirmationAffected) {
-        gameUpdates.confirmation = null;
-      }
-
-      await db.update(`rooms/${this.currentRoomCode}/game`, gameUpdates);
-
-      if (this.selectedTargetPlayerId === kickedPlayerId) {
-        this.selectedTargetPlayerId = null;
-      }
-      if (this.viewingPlayerId === kickedPlayerId) {
-        const remainingOpponents = newTurnOrder.filter(id => id !== this.myPlayerId);
-        this.viewingPlayerId = remainingOpponents[0] || null;
-      }
-
-      // If fewer than 2 players remain, conclude match
-      const remainingPlayers = Object.keys(room.players).filter(id => id !== kickedPlayerId);
-      if (remainingPlayers.length < 2) {
-        await db.update(`rooms/${this.currentRoomCode}/meta`, { status: "game_over" });
-      }
-    } else if (room.meta && room.meta.status === "entry") {
-      const remainingPlayers = Object.values(room.players).filter(p => p.id !== kickedPlayerId);
-      if (remainingPlayers.length >= 2 && remainingPlayers.every(p => p.listSubmitted)) {
-        await this.checkAllListsSubmitted(room);
-      }
+    // If in active game (playing or entry), kicking terminates the room for everyone
+    if (room.meta && (room.meta.status === "playing" || room.meta.status === "entry")) {
+      await db.update(`rooms/${this.currentRoomCode}/meta`, {
+        status: "aborted",
+        abortedReason: `${kickedPlayerName} was removed. Room closed.`
+      });
+      return;
     }
 
-    this.showAlert(`Removed ${kickedPlayerName} from the room.`);
+    // In lobby (before match starts), simply remove that player from the lobby
+    await db.remove(`rooms/${this.currentRoomCode}/players/${kickedPlayerId}`);
+    await db.remove(`rooms/${this.currentRoomCode}/lists/${kickedPlayerId}`);
+    this.showAlert(`Removed ${kickedPlayerName} from the lobby.`);
   }
 
   copyRoomCode() {
@@ -1771,42 +1787,48 @@ class GameController {
   }
 
   // ==========================================================================
-  // CONFIGURATION MODAL (FIREBASE REALTIME DB)
+  // MY LIST OVERLAY DRAWER
   // ==========================================================================
 
-  openConfigModal() {
-    const saved = localStorage.getItem("ta5mena_firebase_config");
-    if (saved) {
-      this.textareaFirebaseConfig.value = saved;
+  toggleMyListDrawer(forceOpen) {
+    const shouldOpen = (typeof forceOpen === "boolean") 
+      ? forceOpen 
+      : !this.modalMyList.classList.contains("open");
+
+    if (shouldOpen) {
+      this.renderMyListDrawer();
+      this.modalMyList.classList.add("open");
+      this.btnHeaderMyList.classList.add("active");
     } else {
-      this.textareaFirebaseConfig.value = JSON.stringify(firebaseConfig, null, 2);
-    }
-    this.modalConfig.classList.add("open");
-  }
-
-  closeConfigModal() {
-    this.modalConfig.classList.remove("open");
-  }
-
-  saveCustomConfig() {
-    try {
-      const parsed = JSON.parse(this.textareaFirebaseConfig.value);
-      if (!parsed.databaseURL || !parsed.apiKey) {
-        throw new Error("Missing databaseURL or apiKey");
-      }
-      localStorage.setItem("ta5mena_firebase_config", JSON.stringify(parsed, null, 2));
-      this.closeConfigModal();
-      this.showAlert("Firebase config updated! Reloading to establish connection...");
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) {
-      this.showAlert("Invalid JSON configuration. Please check the format.");
+      this.modalMyList.classList.remove("open");
+      this.btnHeaderMyList.classList.remove("active");
     }
   }
 
-  resetDefaultConfig() {
-    localStorage.removeItem("ta5mena_firebase_config");
-    this.textareaFirebaseConfig.value = JSON.stringify(firebaseConfig, null, 2);
-    this.showAlert("Reset to default configuration.");
+  renderMyListDrawer() {
+    if (!this.roomData || !this.roomData.lists || !this.myPlayerId) return;
+    const myList = this.roomData.lists[this.myPlayerId] || {};
+
+    this.myListDrawerSlots.innerHTML = "";
+    for (let r = 1; r <= 10; r++) {
+      const slot = myList[r] || { item: "N/A", revealed: false, points: r };
+      const itemEl = document.createElement("div");
+      itemEl.className = `my-list-slot-item ${slot.revealed ? 'revealed' : ''}`;
+
+      const statusTag = slot.revealed
+        ? `<span class="badge badge-success">GUESSED BY ${this.escapeHtml(slot.guessedBy || "Opponent")} (+${slot.points} PTS)</span>`
+        : `<span class="badge">[ HIDDEN - ${slot.points} PTS ]</span>`;
+
+      itemEl.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="mono" style="font-weight: 800; color: var(--accent);">#${r}</span>
+          <span style="font-weight: 600;">${this.escapeHtml(slot.item)}</span>
+        </div>
+        <div>${statusTag}</div>
+      `;
+
+      this.myListDrawerSlots.appendChild(itemEl);
+    }
   }
 
   // ==========================================================================
