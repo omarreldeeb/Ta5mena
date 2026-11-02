@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ta5mena | Real-Time Top 10 Party Game</title>
+  <meta name="description" content="Ta5mena - Real-time online multiplayer party game. Guess your friends' Top 10 lists ranked from 1 to 10.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-container">
+
+    <!-- TOP HEADER -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-mark">10</span>
+        <div>
+          <span class="logo-title">TA5MENA</span>
+          <span class="logo-sub">TOP 10</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div id="header-room-tag" class="room-tag hidden">
+          <span>ROOM</span>
+          <strong id="header-room-code">----</strong>
+        </div>
+        <button id="btn-config-toggle" class="btn btn-sm" title="Database Configuration" aria-label="Database Configuration">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- SYSTEM ALERTS / STATUS -->
+    <div id="system-alert-banner" class="reconnect-card hidden">
+      <div id="system-alert-text">System notice</div>
+      <button id="btn-close-alert" class="btn btn-sm">Dismiss</button>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 1: HOME & RECONNECT SCREEN -->
+    <!-- ===================================================================== -->
+    <main id="view-home" class="view-section active">
+      <!-- Reconnect Box (Visible if saved session exists) -->
+      <div id="reconnect-box" class="reconnect-card hidden">
+        <div>
+          <div class="text-secondary" style="font-size: 12px; font-weight: 700;">ACTIVE SESSION FOUND</div>
+          <div style="font-size: 14px; font-weight: 600;">Rejoin Room <strong id="reconnect-room-label" class="text-accent">----</strong> as <strong id="reconnect-name-label">----</strong></div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btn-reconnect" class="btn btn-primary btn-sm">Rejoin</button>
+          <button id="btn-discard-session" class="btn btn-sm">Clear</button>
+        </div>
+      </div>
+
+      <div class="card home-card">
+        <div>
+          <label for="input-player-name" style="display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px;">YOUR NAME</label>
+          <input type="text" id="input-player-name" placeholder="Enter your display name" maxlength="20" autocomplete="off">
+        </div>
+
+        <div class="home-grid">
+          <!-- Create Room Panel -->
+          <div class="panel-box">
+            <h3>HOST NEW MATCH</h3>
+            <p class="text-secondary" style="font-size: 13px;">Create a private room, pick a category, and invite at least 2 friends.</p>
+            <button id="btn-create-room" class="btn btn-primary btn-block">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              Create Room
+            </button>
+          </div>
+
+          <!-- Join Room Panel -->
+          <div class="panel-box">
+            <h3>JOIN EXISTING ROOM</h3>
+            <p class="text-secondary" style="font-size: 13px;">Enter the 4-letter room code shared by your host.</p>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
+              <button id="btn-join-room" class="btn btn-block" style="flex: 1;">Join Room</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 2: LOBBY & WAITING ROOM -->
+    <!-- ===================================================================== -->
+    <section id="view-lobby" class="view-section">
+      <div class="card lobby-header">
+        <div class="room-share-bar">
+          <div>
+            <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">ROOM CODE</div>
+            <div id="lobby-room-code" class="room-share-code">----</div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-copy-code" class="btn btn-sm">
+              <svg class="icon" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              Copy Code
+            </button>
+            <button id="btn-share-link" class="btn btn-sm">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+              Share Link
+            </button>
+          </div>
+        </div>
+
+        <!-- Category Picker (Host selectable, Guest view-only) -->
+        <div style="margin-top: 10px;">
+          <div class="flex-between" style="margin-bottom: 8px;">
+            <label style="font-weight: 700; font-size: 13px;">MATCH CATEGORY</label>
+            <span id="category-badge-note" class="badge">HOST SELECTS</span>
+          </div>
+
+          <div class="category-selection-grid">
+            <button class="category-option-btn selected" data-category="singers">
+              <span class="category-title">Top 10 Singers</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global Artists</span>
+            </button>
+            <button class="category-option-btn" data-category="football">
+              <span class="category-title">Top 10 Footballers</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global Stars</span>
+            </button>
+            <button class="category-option-btn" data-category="actors">
+              <span class="category-title">Top 10 Actors</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and International</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Player Roster -->
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 10px;">
+          <span style="font-weight: 700; font-size: 13px;">PLAYERS IN LOBBY</span>
+          <span id="lobby-player-count" class="badge">0 / MIN 3</span>
+        </div>
+        <div id="lobby-player-list" class="player-roster">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div id="lobby-min-players-alert" class="entry-notice mt-12">
+          Minimum <strong>3 players</strong> required to start the match. Invite friends using the room code above.
+        </div>
+
+        <div class="flex-between mt-12 gap-8">
+          <button id="btn-leave-room" class="btn btn-danger-outline">Leave</button>
+          <button id="btn-start-match" class="btn btn-primary" style="flex: 1;" disabled>
+            Start Match
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 3: SECRET LIST ENTRY PHASE -->
+    <!-- ===================================================================== -->
+    <section id="view-entry" class="view-section">
+      <div class="card">
+        <div class="flex-between">
+          <div>
+            <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">SECRET LIST BUILDER</div>
+            <h2 id="entry-category-title" style="font-size: 17px; margin-top: 2px;">Top 10 Favorite Singers</h2>
+          </div>
+          <span class="badge badge-accent">RANK = POINTS</span>
+        </div>
+
+        <div class="entry-notice mt-8">
+          Rank from #1 (Favorite) down to #10 (10th Favorite).
+          <strong>#1 is worth 1 pt, #10 is worth 10 pts.</strong>
+          Opponents will guess your items to score points. No duplicate entries allowed.
+        </div>
+
+        <div id="entry-slots-container" class="slots-grid mt-12">
+          <!-- Slots 1 to 10 rendered here -->
+        </div>
+
+        <div id="entry-error-banner" class="entry-notice mt-12 hidden" style="border-left-color: var(--danger); color: var(--danger);">
+          Please fill all 10 slots without duplicate entries.
+        </div>
+
+        <button id="btn-submit-list" class="btn btn-primary btn-block mt-12">
+          <svg class="icon" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Lock In My Top 10
+        </button>
+      </div>
+
+      <!-- Entry Phase Waiting Card (Shown after submitting) -->
+      <div id="entry-waiting-card" class="card entry-waiting-card hidden">
+        <div class="flex-between">
+          <span style="font-weight: 700; font-size: 14px;">ROSTER STATUS</span>
+          <span id="entry-locked-count" class="badge badge-success">0 / 0 LOCKED</span>
+        </div>
+        <p class="text-secondary" style="font-size: 13px;">Your list is locked. Waiting for remaining players to complete their Top 10 lists...</p>
+        <div id="entry-status-roster" class="lock-status-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 4: MAIN GAME PHASE -->
+    <!-- ===================================================================== -->
+    <section id="view-game" class="view-section">
+      <!-- Live Action Feed Ticker -->
+      <div class="action-feed">
+        <span id="action-feed-text" class="action-feed-text">Match started. Round 1 in progress.</span>
+        <span id="action-feed-time" class="action-feed-time">LIVE</span>
+      </div>
+
+      <!-- Turn Sequence Bar -->
+      <div class="card" style="padding: 10px 12px;">
+        <div class="flex-between" style="margin-bottom: 6px;">
+          <span class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">TURN ORDER</span>
+          <span id="game-round-indicator" class="badge">ROUND 1</span>
+        </div>
+        <div id="turn-order-container" class="turn-order-bar">
+          <!-- Turn pills rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- ACTIVE PLAYER GUESSING CONTROL BOX (When it's your turn) -->
+      <div id="active-turn-control" class="control-box hidden">
+        <div class="control-box-header">
+          <span class="control-box-title">YOUR TURN: GUESS AN OPPONENT'S ITEM</span>
+          <span class="badge badge-accent">1 GUESS ONLY</span>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">1. SELECT TARGET PLAYER</label>
+          <div id="target-player-grid" class="target-selector-grid">
+            <!-- Opponent buttons rendered here -->
+          </div>
+        </div>
+
+        <div style="position: relative;">
+          <label for="input-turn-guess" style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">2. TYPE GUESS (AUTOCOMPLETE OR FREE-TEXT)</label>
+          <div class="guess-input-row">
+            <input type="text" id="input-turn-guess" placeholder="Type a name..." autocomplete="off">
+            <button id="btn-submit-guess" class="btn btn-primary" disabled>Submit Guess</button>
+          </div>
+          <!-- Autocomplete dropdown for active guess -->
+          <div id="turn-autocomplete-dropdown" class="autocomplete-dropdown"></div>
+        </div>
+      </div>
+
+      <!-- PASSIVE TURN BANNER (When it's someone else's turn) -->
+      <div id="passive-turn-banner" class="passive-turn-banner">
+        <div>
+          <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">CURRENT TURN</div>
+          <div class="passive-turn-text">Waiting for <strong id="passive-active-player-name">Player</strong> to guess...</div>
+        </div>
+        <span class="badge">IN PROGRESS</span>
+      </div>
+
+      <!-- BOARD DISPLAY: OPPONENT & PRIVATE LISTS -->
+      <div class="card">
+        <div class="board-header-row">
+          <div id="player-tabs-bar" class="player-tabs-bar">
+            <!-- Opponent tabs dynamically created -->
+          </div>
+          <button id="btn-toggle-my-list" class="my-list-toggle-btn">
+            My Secret List
+          </button>
+        </div>
+
+        <!-- Target Player Info Banner -->
+        <div id="selected-board-header" class="flex-between mt-8" style="padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
+          <div>
+            <span id="selected-board-player-name" style="font-weight: 700; font-size: 15px;">Player Name</span>
+            <span id="selected-board-status-badge" class="badge" style="margin-left: 6px;">7 / 10 HIDDEN</span>
+          </div>
+          <span id="selected-board-score-tag" class="text-secondary" style="font-size: 12px; font-family: var(--font-mono);">SCORE: 0 PTS</span>
+        </div>
+
+        <!-- Slots List 10 down to 1 (or 1 to 10) -->
+        <div id="board-slots-list" class="board-list-card mt-8">
+          <!-- 10 Slots rendered here -->
+        </div>
+      </div>
+
+      <!-- STANDINGS LEADERBOARD -->
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 8px;">
+          <span style="font-weight: 700; font-size: 13px;">LIVE STANDINGS</span>
+          <span class="text-secondary" style="font-size: 11px; font-family: var(--font-mono);">SORTED BY POINTS</span>
+        </div>
+        <div id="live-standings-grid" class="standings-list">
+          <!-- Mini score badges -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 5: LIVE TARGET CONFIRMATION POPUP (LAYER 3 FALLBACK) -->
+    <!-- ===================================================================== -->
+    <div id="modal-confirmation" class="modal-backdrop">
+      <div class="confirm-modal-box">
+        <div class="flex-between">
+          <span style="font-size: 13px; font-weight: 800; font-family: var(--font-mono); color: var(--accent);">TARGET CONFIRMATION NEEDED</span>
+          <span class="badge badge-accent">LAYER 3 VERIFICATION</span>
+        </div>
+
+        <div style="font-size: 14px;">
+          <strong id="confirm-guesser-name" class="text-accent">Player A</strong> guessed:
+        </div>
+
+        <div id="confirm-guess-text" class="confirm-guess-highlight">"Guessed Name"</div>
+
+        <p class="text-secondary" style="font-size: 13px;">
+          Does this match any of your remaining unrevealed items below? If yes, tap the slot to award points. If no, click "Not on my list".
+        </p>
+
+        <!-- Clickable list of target player's unguessed slots -->
+        <div id="confirm-slots-container" class="confirm-slots-grid">
+          <!-- Slot buttons rendered here -->
+        </div>
+
+        <button id="btn-confirm-wrong" class="btn btn-danger btn-block">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Not on my list (Wrong Guess)
+        </button>
+      </div>
+    </div>
+
+    <!-- Spectator Waiting Confirmation Banner (Shown when other players are waiting for confirmation) -->
+    <div id="waiting-confirmation-backdrop" class="modal-backdrop">
+      <div class="confirm-modal-box" style="text-align: center;">
+        <span class="badge badge-accent" style="align-self: center;">VERIFICATION IN PROGRESS</span>
+        <div style="font-size: 15px; font-weight: 600; margin-top: 8px;">
+          Waiting for <strong id="spec-target-name" class="text-accent">Player B</strong> to confirm guess:
+        </div>
+        <div id="spec-guess-text" class="confirm-guess-highlight">"Guess"</div>
+        <p class="text-secondary" style="font-size: 12px;">The targeted player is checking their secret list.</p>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 6: GAME OVER SCREEN & PODIUM -->
+    <!-- ===================================================================== -->
+    <section id="view-game-over" class="view-section">
+      <div class="game-over-banner">
+        <span class="badge badge-accent">MATCH FINISHED</span>
+        <h2 style="font-size: 20px;">FINAL RESULTS</h2>
+        <div id="podium-winner-name" class="winner-highlight">Player Name</div>
+        <p class="text-secondary" style="font-size: 13px;">Highest point total across all revealed Top 10 lists.</p>
+      </div>
+
+      <!-- Final Leaderboard -->
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 10px;">
+          <span style="font-weight: 700; font-size: 13px;">FINAL LEADERBOARD</span>
+          <span class="text-secondary" style="font-size: 11px; font-family: var(--font-mono);">FINAL POINTS</span>
+        </div>
+        <div id="final-leaderboard-list" class="final-scoreboard">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Full Revealed Lists for All Players -->
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 10px;">
+          <span style="font-weight: 700; font-size: 13px;">FULL REVEALED LISTS</span>
+          <span class="text-secondary" style="font-size: 11px; font-family: var(--font-mono);">ALL PLAYERS</span>
+        </div>
+        <div id="final-all-lists-container" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Host Action Bar -->
+      <div class="card">
+        <div class="flex-between gap-8">
+          <button id="btn-return-home" class="btn btn-block">Exit to Home</button>
+          <button id="btn-play-again" class="btn btn-primary btn-block">Play Again in Same Room</button>
+        </div>
+        <p id="play-again-note" class="text-secondary mt-8" style="font-size: 12px; text-align: center;">Only the Room Host can trigger Play Again.</p>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- CONFIGURATION MODAL (FIREBASE REALTIME DB CREDENTIALS) -->
+    <!-- ===================================================================== -->
+    <div id="modal-config" class="modal-backdrop">
+      <div class="config-modal-box">
+        <div class="flex-between">
+          <span style="font-size: 13px; font-weight: 800; font-family: var(--font-mono);">FIREBASE DATABASE SETUP</span>
+          <button id="btn-close-config" class="btn btn-sm">Close</button>
+        </div>
+
+        <p class="text-secondary" style="font-size: 13px;">
+          Ta5mena connects to Firebase Realtime Database. You can paste your Firebase config JSON below or use the default embedded configuration.
+        </p>
+
+        <textarea id="textarea-firebase-config" placeholder='{\n  "apiKey": "...",\n  "databaseURL": "https://...",\n  "projectId": "..."\n}'></textarea>
+
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+          Ensure Realtime Database rules allow read/write in test mode:<br>
+          <code class="mono" style="color: var(--accent);">{ ".read": true, ".write": true }</code>
+        </div>
+
+        <div class="flex-between gap-8">
+          <button id="btn-reset-config" class="btn btn-sm">Reset to Default</button>
+          <button id="btn-save-config" class="btn btn-primary btn-sm">Save & Connect</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODULE SCRIPTS -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
