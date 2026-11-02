@@ -96,11 +96,41 @@ class DatabaseService {
       const { ref, set } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
       return set(ref(this.fbDb, path), data);
     } else {
+      if (data === null) {
+        return this.remove(path);
+      }
       localStorage.setItem("db_" + path, JSON.stringify(data));
       if (this.broadcastChannel) {
         this.broadcastChannel.postMessage({ path, data });
       }
       this.triggerLocalListeners(path, data);
+      return Promise.resolve();
+    }
+  }
+
+  async remove(path) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      const { ref, remove } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      return remove(ref(this.fbDb, path));
+    } else {
+      localStorage.removeItem("db_" + path);
+      // Clean up in parent room cache if present
+      const segments = path.split("/");
+      if (segments.length >= 3) {
+        const rootPath = segments.slice(0, 2).join("/");
+        const roomObj = (await this.get(rootPath)) || {};
+        let cursor = roomObj;
+        for (let i = 2; i < segments.length - 1; i++) {
+          if (cursor[segments[i]]) cursor = cursor[segments[i]];
+        }
+        delete cursor[segments[segments.length - 1]];
+        localStorage.setItem("db_" + rootPath, JSON.stringify(roomObj));
+      }
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({ path, data: null });
+      }
+      this.triggerLocalListeners(path, null);
       return Promise.resolve();
     }
   }
@@ -555,6 +585,8 @@ class GameController {
     this.discardSession();
     this.currentRoomCode = null;
     this.roomData = null;
+    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
+    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
     this.switchView("home");
   }
 
@@ -577,8 +609,8 @@ class GameController {
       this.roomData = room;
       const me = room.players ? room.players[this.myPlayerId] : null;
       if (!me) {
-        this.showAlert("You were disconnected from this room.");
         this.leaveRoom();
+        this.showAlert("You were removed from the room by the host.");
         return;
       }
 
@@ -643,6 +675,7 @@ class GameController {
 
       const isHostTag = p.isHost ? '<span class="badge badge-accent">HOST</span>' : '';
       const isYouTag = p.id === this.myPlayerId ? '<span class="badge">YOU</span>' : '';
+      const isKickable = this.isHost && p.id !== this.myPlayerId;
 
       item.innerHTML = `
         <div class="roster-item-info">
@@ -650,8 +683,22 @@ class GameController {
           ${isHostTag}
           ${isYouTag}
         </div>
-        <span class="mono text-secondary" style="font-size: 11px;">READY</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="mono text-secondary" style="font-size: 11px;">READY</span>
+          ${isKickable ? `<button class="btn btn-kick" data-kick-id="${p.id}">KICK</button>` : ''}
+        </div>
       `;
+
+      if (isKickable) {
+        const kickBtn = item.querySelector(`[data-kick-id="${p.id}"]`);
+        if (kickBtn) {
+          kickBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.handleKickPlayer(p.id, p.name);
+          });
+        }
+      }
+
       this.lobbyPlayerList.appendChild(item);
     });
 
@@ -682,6 +729,90 @@ class GameController {
     }
 
     await db.update(`rooms/${this.currentRoomCode}/meta`, { status: "entry" });
+  }
+
+  async handleKickPlayer(kickedPlayerId, kickedPlayerName) {
+    if (!this.isHost || !this.currentRoomCode || kickedPlayerId === this.myPlayerId) return;
+
+    const room = this.roomData;
+    if (!room || !room.players || !room.players[kickedPlayerId]) return;
+
+    // 1. Remove player node and list node from database
+    await db.remove(`rooms/${this.currentRoomCode}/players/${kickedPlayerId}`);
+    await db.remove(`rooms/${this.currentRoomCode}/lists/${kickedPlayerId}`);
+
+    // 2. If currently in playing phase, cleanly advance/adjust game state
+    if (room.meta && room.meta.status === "playing") {
+      const game = room.game || {};
+      const turnOrder = game.turnOrder || [];
+      const kickedIndex = turnOrder.indexOf(kickedPlayerId);
+      const newTurnOrder = turnOrder.filter(id => id !== kickedPlayerId);
+
+      let newTurnIndex = game.currentTurnIndex || 0;
+      let newActivePlayerId = game.activePlayerId;
+
+      if (newTurnOrder.length > 0) {
+        if (game.activePlayerId === kickedPlayerId) {
+          // Kicked player was active turn player: advance turn to next player in turnOrder
+          newTurnIndex = (kickedIndex >= 0 ? kickedIndex : newTurnIndex) % newTurnOrder.length;
+          newActivePlayerId = newTurnOrder[newTurnIndex];
+        } else if (kickedIndex >= 0 && kickedIndex < newTurnIndex) {
+          // Kicked player was before active player in turnOrder: decrement index
+          newTurnIndex = (newTurnIndex - 1 + newTurnOrder.length) % newTurnOrder.length;
+          newActivePlayerId = newTurnOrder[newTurnIndex];
+        } else {
+          newTurnIndex = newTurnIndex % newTurnOrder.length;
+          newActivePlayerId = newTurnOrder[newTurnIndex];
+        }
+      } else {
+        newTurnIndex = 0;
+        newActivePlayerId = null;
+      }
+
+      // Check if confirmation modal was pending involving the kicked player
+      const confirmation = game.confirmation;
+      const isConfirmationAffected = confirmation && (
+        confirmation.fromPlayerId === kickedPlayerId || 
+        confirmation.toPlayerId === kickedPlayerId
+      );
+
+      const gameUpdates = {
+        turnOrder: newTurnOrder,
+        currentTurnIndex: newTurnIndex,
+        activePlayerId: newActivePlayerId,
+        lastAction: {
+          text: `${kickedPlayerName} was removed from the match by the host.`,
+          timestamp: Date.now()
+        }
+      };
+
+      if (isConfirmationAffected) {
+        gameUpdates.confirmation = null;
+      }
+
+      await db.update(`rooms/${this.currentRoomCode}/game`, gameUpdates);
+
+      if (this.selectedTargetPlayerId === kickedPlayerId) {
+        this.selectedTargetPlayerId = null;
+      }
+      if (this.viewingPlayerId === kickedPlayerId) {
+        const remainingOpponents = newTurnOrder.filter(id => id !== this.myPlayerId);
+        this.viewingPlayerId = remainingOpponents[0] || null;
+      }
+
+      // If fewer than 2 players remain, conclude match
+      const remainingPlayers = Object.keys(room.players).filter(id => id !== kickedPlayerId);
+      if (remainingPlayers.length < 2) {
+        await db.update(`rooms/${this.currentRoomCode}/meta`, { status: "game_over" });
+      }
+    } else if (room.meta && room.meta.status === "entry") {
+      const remainingPlayers = Object.values(room.players).filter(p => p.id !== kickedPlayerId);
+      if (remainingPlayers.length >= 2 && remainingPlayers.every(p => p.listSubmitted)) {
+        await this.checkAllListsSubmitted(room);
+      }
+    }
+
+    this.showAlert(`Removed ${kickedPlayerName} from the room.`);
   }
 
   copyRoomCode() {
@@ -876,10 +1007,26 @@ class GameController {
       const item = document.createElement("div");
       item.className = "lock-status-item";
       const isLocked = p.listSubmitted;
+      const isKickable = this.isHost && p.id !== this.myPlayerId;
+
       item.innerHTML = `
-        <span>${this.escapeHtml(p.name)} ${p.id === this.myPlayerId ? '(You)' : ''}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>${this.escapeHtml(p.name)} ${p.id === this.myPlayerId ? '(You)' : ''}</span>
+          ${isKickable ? `<button class="btn btn-kick" data-kick-id="${p.id}">KICK</button>` : ''}
+        </div>
         <span class="badge ${isLocked ? 'badge-success' : ''}">${isLocked ? 'LOCKED' : 'TYPING...'}</span>
       `;
+
+      if (isKickable) {
+        const kickBtn = item.querySelector(`[data-kick-id="${p.id}"]`);
+        if (kickBtn) {
+          kickBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.handleKickPlayer(p.id, p.name);
+          });
+        }
+      }
+
       this.entryStatusRoster.appendChild(item);
     });
 
@@ -888,7 +1035,7 @@ class GameController {
 
   async checkAllListsSubmitted(room) {
     const players = Object.values(room.players || {});
-    if (players.length < 3) return;
+    if (players.length < 2) return;
 
     const allSubmitted = players.every(p => p.listSubmitted);
     if (!allSubmitted) return;
@@ -1408,8 +1555,24 @@ class GameController {
       this.selectedBoardPlayerName.textContent = "My Secret List";
       this.selectedBoardScoreTag.textContent = `MY SCORE: ${player.points || 0} PTS`;
     } else {
-      this.selectedBoardPlayerName.textContent = `${player.name}'s List`;
+      const isKickable = this.isHost && targetId !== this.myPlayerId;
+      this.selectedBoardPlayerName.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>${this.escapeHtml(player.name)}'s List</span>
+          ${isKickable ? `<button class="btn btn-kick" id="btn-kick-viewed-player">KICK</button>` : ''}
+        </div>
+      `;
       this.selectedBoardScoreTag.textContent = `SCORE: ${player.points || 0} PTS`;
+
+      if (isKickable) {
+        const kickViewedBtn = document.getElementById("btn-kick-viewed-player");
+        if (kickViewedBtn) {
+          kickViewedBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.handleKickPlayer(targetId, player.name);
+          });
+        }
+      }
     }
 
     let hiddenCount = 0;
@@ -1472,12 +1635,28 @@ class GameController {
     this.liveStandingsGrid.innerHTML = "";
     players.forEach(p => {
       const badge = document.createElement("div");
-      const isTurn = (p.id === room.game.activePlayerId);
+      const isTurn = (p.id === room.game?.activePlayerId);
+      const isKickable = this.isHost && p.id !== this.myPlayerId;
+
       badge.className = `standing-badge ${isTurn ? 'active-turn-standing' : ''}`;
       badge.innerHTML = `
-        <span>${this.escapeHtml(p.name)} ${p.id === this.myPlayerId ? '(You)' : ''}</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span>${this.escapeHtml(p.name)} ${p.id === this.myPlayerId ? '(You)' : ''}</span>
+          ${isKickable ? `<button class="btn btn-kick" data-kick-id="${p.id}">KICK</button>` : ''}
+        </div>
         <span class="pts">${p.points || 0} pts</span>
       `;
+
+      if (isKickable) {
+        const kickBtn = badge.querySelector(`[data-kick-id="${p.id}"]`);
+        if (kickBtn) {
+          kickBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.handleKickPlayer(p.id, p.name);
+          });
+        }
+      }
+
       this.liveStandingsGrid.appendChild(badge);
     });
   }
