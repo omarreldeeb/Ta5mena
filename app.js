@@ -281,6 +281,9 @@ class GameController {
 
     // Entry Phase
     this.entryCategoryTitle = document.getElementById("entry-category-title");
+    this.restoreBanner = document.getElementById("restore-banner");
+    this.restoreCategoryLabel = document.getElementById("restore-category-label");
+    this.btnRestoreLastList = document.getElementById("btn-restore-last-list");
     this.entrySlotsContainer = document.getElementById("entry-slots-container");
     this.btnSubmitList = document.getElementById("btn-submit-list");
     this.entryErrorBanner = document.getElementById("entry-error-banner");
@@ -375,6 +378,7 @@ class GameController {
     this.btnLeaveRoom.addEventListener("click", () => this.handleLeaveRoom());
 
     // Entry Phase
+    this.btnRestoreLastList.addEventListener("click", () => this.restoreLastList());
     this.btnSubmitList.addEventListener("click", () => this.handleSubmitSecretList());
 
     // Game Phase
@@ -887,6 +891,7 @@ class GameController {
         const input = document.getElementById(`entry-slot-input-${i}`);
         if (input) input.disabled = true;
       }
+      if (this.restoreBanner) this.restoreBanner.classList.add("hidden");
       this.entryWaitingCard.classList.remove("hidden");
       this.updateEntryRosterStatus(room);
     } else {
@@ -896,6 +901,7 @@ class GameController {
         Lock In My Top 10
       `;
       this.entryWaitingCard.classList.add("hidden");
+      this.checkRestoreButtonVisibility();
     }
 
     // Check if ALL players have submitted their lists. If so, transition to 'playing'
@@ -921,6 +927,7 @@ class GameController {
 
       const input = row.querySelector(`#entry-slot-input-${rank}`);
       const dropdown = row.querySelector(`#autocomplete-slot-${rank}`);
+      input.addEventListener("input", () => this.backupSecretList());
       this.setupAutocomplete(input, dropdown);
     }
   }
@@ -954,6 +961,7 @@ class GameController {
           inputElement.value = m.name;
           dropdownElement.classList.remove("open");
           dropdownElement.innerHTML = "";
+          this.backupSecretList();
         });
         dropdownElement.appendChild(item);
       });
@@ -1008,9 +1016,78 @@ class GameController {
 
     this.entryErrorBanner.classList.add("hidden");
 
+    // Backup locally
+    this.backupSecretList();
+
     // Save list and update player status
     await db.set(`rooms/${this.currentRoomCode}/lists/${this.myPlayerId}`, slots);
     await db.update(`rooms/${this.currentRoomCode}/players/${this.myPlayerId}`, { listSubmitted: true });
+  }
+
+  backupSecretList() {
+    const items = {};
+    let filledCount = 0;
+    for (let rank = 1; rank <= 10; rank++) {
+      const input = document.getElementById(`entry-slot-input-${rank}`);
+      const val = input ? input.value.trim() : "";
+      items[rank] = val;
+      if (val) filledCount++;
+    }
+
+    if (filledCount > 0) {
+      const backupData = {
+        category: this.category,
+        items: items,
+        timestamp: Date.now()
+      };
+      localStorage.setItem("ta5mena_last_list", JSON.stringify(backupData));
+      this.checkRestoreButtonVisibility();
+    }
+  }
+
+  checkRestoreButtonVisibility() {
+    if (!this.restoreBanner) return;
+    const raw = localStorage.getItem("ta5mena_last_list");
+    if (!raw) {
+      this.restoreBanner.classList.add("hidden");
+      return;
+    }
+
+    try {
+      const data = JSON.parse(raw);
+      const items = data.items || data;
+      const filled = Object.values(items).filter(v => typeof v === "string" && v.trim().length > 0);
+      if (filled.length > 0) {
+        this.restoreCategoryLabel.textContent = data.category ? data.category.toUpperCase() : "SAVED";
+        this.restoreBanner.classList.remove("hidden");
+      } else {
+        this.restoreBanner.classList.add("hidden");
+      }
+    } catch (e) {
+      this.restoreBanner.classList.add("hidden");
+    }
+  }
+
+  restoreLastList() {
+    const raw = localStorage.getItem("ta5mena_last_list");
+    if (!raw) return;
+
+    try {
+      const data = JSON.parse(raw);
+      const items = data.items || data;
+
+      for (let rank = 1; rank <= 10; rank++) {
+        const input = document.getElementById(`entry-slot-input-${rank}`);
+        if (input && items[rank] !== undefined) {
+          input.value = items[rank];
+        }
+      }
+
+      this.backupSecretList();
+      this.showAlert("Restored all 10 picks from your saved backup!");
+    } catch (err) {
+      console.warn("Failed to restore list:", err);
+    }
   }
 
   updateEntryRosterStatus(room) {
