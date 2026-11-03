@@ -27,6 +27,9 @@
         <button id="btn-header-my-list" class="btn btn-sm btn-my-list hidden">
           MY LIST
         </button>
+        <button id="btn-header-leave" class="btn btn-sm btn-danger-outline hidden" title="Leave this room">
+          LEAVE
+        </button>
       </div>
     </header>
 
@@ -89,8 +92,11 @@
       <div class="card lobby-header">
         <div class="room-share-bar">
           <div>
-            <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">ROOM CODE</div>
-            <div id="lobby-room-code" class="room-share-code">----</div>
+            <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono); display: flex; align-items: center; gap: 4px;">
+              <span>ROOM CODE</span>
+              <span class="badge" style="font-size: 9px; padding: 1px 4px; border-color: var(--border-strong);">TAP TO COPY</span>
+            </div>
+            <div id="lobby-room-code" class="room-share-code" title="Tap to copy invite link" role="button" tabindex="0">----</div>
           </div>
           <div style="display: flex; gap: 6px;">
             <button id="btn-copy-code" class="btn btn-sm">
@@ -144,6 +150,25 @@
               <span class="category-title">Foods</span>
               <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">World Cuisines & Dishes</span>
             </button>
+            <button class="category-option-btn" data-category="custom">
+              <span class="category-title">Custom Topic</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Host's Choice</span>
+            </button>
+          </div>
+
+          <!-- Custom Category Input (Host editable, Guest view) -->
+          <div id="custom-category-box" class="custom-category-container hidden mt-8">
+            <div class="flex-between">
+              <label for="input-custom-category-title" style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">
+                ENTER CUSTOM TOPIC TITLE
+              </label>
+              <span id="custom-category-status" class="badge">REQUIRED</span>
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 6px;">
+              <input type="text" id="input-custom-category-title" placeholder="e.g. Video Games, Restaurants, Songs..." maxlength="30" autocomplete="off" style="flex: 1;">
+              <button id="btn-save-custom-category" type="button" class="btn btn-primary btn-sm">Set Topic</button>
+            </div>
+            <div id="custom-category-display-note" class="text-secondary hidden" style="font-size: 11px; margin-top: 4px;"></div>
           </div>
         </div>
       </div>
@@ -238,7 +263,10 @@
       <div class="card" style="padding: 10px 12px;">
         <div class="flex-between" style="margin-bottom: 6px;">
           <span class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">TURN ORDER</span>
-          <span id="game-round-indicator" class="badge">ROUND 1</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button id="btn-host-skip-turn-bar" type="button" class="btn btn-sm btn-danger-outline hidden" style="height: 24px; padding: 0 8px; font-size: 11px; font-family: var(--font-mono);">SKIP TURN</button>
+            <span id="game-round-indicator" class="badge">ROUND 1</span>
+          </div>
         </div>
         <div id="turn-order-container" class="turn-order-bar">
           <!-- Turn pills rendered dynamically -->
@@ -256,6 +284,11 @@
           <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">1. SELECT TARGET PLAYER</label>
           <div id="target-player-grid" class="target-selector-grid">
             <!-- Opponent buttons rendered here -->
+          </div>
+          <!-- Wrong guesses made against the selected target -->
+          <div id="target-missed-guesses-box" class="missed-guesses-box hidden mt-8">
+            <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
+            <div id="target-missed-guesses-list" class="missed-guesses-tags"></div>
           </div>
         </div>
 
@@ -276,7 +309,10 @@
           <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">CURRENT TURN</div>
           <div class="passive-turn-text">Waiting for <strong id="passive-active-player-name">Player</strong> to guess...</div>
         </div>
-        <span class="badge">IN PROGRESS</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="btn-host-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
+          <span class="badge">IN PROGRESS</span>
+        </div>
       </div>
 
       <!-- BOARD DISPLAY: OPPONENT & PRIVATE LISTS -->
@@ -297,6 +333,10 @@
             <span id="selected-board-status-badge" class="badge" style="margin-left: 6px;">7 / 10 HIDDEN</span>
           </div>
           <span id="selected-board-score-tag" class="text-secondary" style="font-size: 12px; font-family: var(--font-mono);">SCORE: 0 PTS</span>
+        </div>
+        <div id="board-missed-guesses-box" class="missed-guesses-box hidden mt-8">
+          <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
+          <div id="board-missed-guesses-list" class="missed-guesses-tags"></div>
         </div>
 
         <!-- Slots List 10 down to 1 (or 1 to 10) -->
@@ -458,6 +498,13 @@
             <!-- Rendered dynamically -->
           </div>
         </div>
+
+        <!-- Persistent Leave Button inside Pause Overlay -->
+        <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 12px; display: flex; justify-content: center;">
+          <button id="btn-pause-leave-room" type="button" class="btn btn-danger-outline btn-block">
+            LEAVE ROOM
+          </button>
+        </div>
       </div>
     </div>
 
@@ -501,6 +548,23 @@
             </div>
             <div id="custom-hint-error" class="hidden" style="color: var(--danger); font-size: 11px; margin-top: 6px;"></div>
           </div>
+        </div>
+      </div>
+    <!-- ===================================================================== -->
+    <!-- VIEW: REUSABLE SHARP CONFIRMATION MODAL -->
+    <!-- ===================================================================== -->
+    <div id="modal-confirm" class="modal-backdrop modal-confirm-backdrop">
+      <div class="confirm-modal-box sharp-modal-box">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <span id="confirm-modal-title" style="font-size: 13px; font-weight: 800; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent);">CONFIRM ACTION</span>
+          <button id="btn-close-confirm-modal" type="button" class="btn btn-sm">Close</button>
+        </div>
+        <div id="confirm-modal-message" style="font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--text-primary); margin: 6px 0;">
+          Are you sure?
+        </div>
+        <div class="flex-between gap-8 mt-8">
+          <button id="btn-modal-cancel" type="button" class="btn btn-block">CANCEL</button>
+          <button id="btn-modal-confirm-action" type="button" class="btn btn-danger btn-block">CONFIRM</button>
         </div>
       </div>
     </div>

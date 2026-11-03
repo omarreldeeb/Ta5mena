@@ -954,7 +954,8 @@ export const SUGGESTIONS = {
     { name: "Lasagna", ar: "لازانيا" },
     { name: "Tom Yum", ar: "شوربة توم يام" },
     { name: "Butter Chicken", ar: "بتر تشيكن هندي" }
-  ]
+  ],
+  custom: []
 };
 
 // ============================================================================

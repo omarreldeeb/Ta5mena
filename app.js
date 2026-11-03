@@ -255,10 +255,14 @@ class GameController {
     this.activeHintTargetSlot = null;
     this.seenHints = new Set();
     this.connectedTimestamp = Date.now();
+    this.pendingConfirmCallback = null;
+    this.customCategoryAutoSaveTimeout = null;
 
     this.cacheDomElements();
     this.bindEvents();
+    this.checkUrlRoomParam();
     this.checkSavedSession();
+    this.startLivenessCheck();
   }
 
   cacheDomElements() {
@@ -268,16 +272,26 @@ class GameController {
       lobby: document.getElementById("view-lobby"),
       entry: document.getElementById("view-entry"),
       game: document.getElementById("view-game"),
-      gameOver: document.getElementById("view-game-over")
+      gameOver: document.getElementById("view-game-over"),
+      game_over: document.getElementById("view-game-over")
     };
 
     // Header & Alert
     this.headerRoomTag = document.getElementById("header-room-tag");
     this.headerRoomCode = document.getElementById("header-room-code");
     this.btnHeaderMyList = document.getElementById("btn-header-my-list");
+    this.btnHeaderLeave = document.getElementById("btn-header-leave");
     this.systemAlertBanner = document.getElementById("system-alert-banner");
     this.systemAlertText = document.getElementById("system-alert-text");
     this.btnCloseAlert = document.getElementById("btn-close-alert");
+
+    // Reusable Sharp Confirmation Modal
+    this.modalConfirm = document.getElementById("modal-confirm");
+    this.confirmModalTitle = document.getElementById("confirm-modal-title");
+    this.confirmModalMessage = document.getElementById("confirm-modal-message");
+    this.btnModalCancel = document.getElementById("btn-modal-cancel");
+    this.btnModalConfirmAction = document.getElementById("btn-modal-confirm-action");
+    this.btnCloseConfirmModal = document.getElementById("btn-close-confirm-modal");
 
     // My List Drawer Modal
     this.modalMyList = document.getElementById("modal-my-list");
@@ -302,6 +316,11 @@ class GameController {
     this.btnShareLink = document.getElementById("btn-share-link");
     this.categoryOptionBtns = document.querySelectorAll(".category-option-btn");
     this.categoryBadgeNote = document.getElementById("category-badge-note");
+    this.customCategoryBox = document.getElementById("custom-category-box");
+    this.inputCustomCategoryTitle = document.getElementById("input-custom-category-title");
+    this.btnSaveCustomCategory = document.getElementById("btn-save-custom-category");
+    this.customCategoryStatus = document.getElementById("custom-category-status");
+    this.customCategoryDisplayNote = document.getElementById("custom-category-display-note");
     this.lobbyPlayerList = document.getElementById("lobby-player-list");
     this.lobbyPlayerCount = document.getElementById("lobby-player-count");
     this.lobbyMinPlayersAlert = document.getElementById("lobby-min-players-alert");
@@ -325,10 +344,14 @@ class GameController {
     this.actionFeedTime = document.getElementById("action-feed-time");
     this.turnOrderContainer = document.getElementById("turn-order-container");
     this.gameRoundIndicator = document.getElementById("game-round-indicator");
+    this.btnHostSkipTurnBar = document.getElementById("btn-host-skip-turn-bar");
     this.activeTurnControl = document.getElementById("active-turn-control");
     this.passiveTurnBanner = document.getElementById("passive-turn-banner");
     this.passiveActivePlayerName = document.getElementById("passive-active-player-name");
+    this.btnHostSkipTurn = document.getElementById("btn-host-skip-turn");
     this.targetPlayerGrid = document.getElementById("target-player-grid");
+    this.targetMissedGuessesBox = document.getElementById("target-missed-guesses-box");
+    this.targetMissedGuessesList = document.getElementById("target-missed-guesses-list");
     this.inputTurnGuess = document.getElementById("input-turn-guess");
     this.btnSubmitGuess = document.getElementById("btn-submit-guess");
     this.turnAutocompleteDropdown = document.getElementById("turn-autocomplete-dropdown");
@@ -337,6 +360,8 @@ class GameController {
     this.selectedBoardPlayerName = document.getElementById("selected-board-player-name");
     this.selectedBoardStatusBadge = document.getElementById("selected-board-status-badge");
     this.selectedBoardScoreTag = document.getElementById("selected-board-score-tag");
+    this.boardMissedGuessesBox = document.getElementById("board-missed-guesses-box");
+    this.boardMissedGuessesList = document.getElementById("board-missed-guesses-list");
     this.boardSlotsList = document.getElementById("board-slots-list");
     this.liveStandingsGrid = document.getElementById("live-standings-grid");
 
@@ -356,6 +381,7 @@ class GameController {
     this.pauseDisconnectedNames = document.getElementById("pause-disconnected-names");
     this.pauseHostActions = document.getElementById("pause-host-actions");
     this.pauseKickButtonsContainer = document.getElementById("pause-kick-buttons-container");
+    this.btnPauseLeaveRoom = document.getElementById("btn-pause-leave-room");
 
     // Give Hint Modal
     this.modalGiveHint = document.getElementById("modal-give-hint");
@@ -381,6 +407,26 @@ class GameController {
   bindEvents() {
     // Navigation / Alerts
     this.btnCloseAlert.addEventListener("click", () => this.hideAlert());
+
+    // Reusable Confirmation Modal
+    this.btnModalCancel.addEventListener("click", () => this.closeConfirmModal());
+    this.btnCloseConfirmModal.addEventListener("click", () => this.closeConfirmModal());
+    this.modalConfirm.addEventListener("click", (e) => {
+      if (e.target === this.modalConfirm) this.closeConfirmModal();
+    });
+    this.btnModalConfirmAction.addEventListener("click", () => {
+      if (this.pendingConfirmCallback) {
+        const cb = this.pendingConfirmCallback;
+        this.closeConfirmModal();
+        cb();
+      }
+    });
+
+    // Persistent Leave Room Buttons (Header, Lobby, Pause Overlay, Game Over)
+    this.btnHeaderLeave.addEventListener("click", () => this.requestLeaveRoom());
+    this.btnLeaveRoom.addEventListener("click", () => this.requestLeaveRoom());
+    this.btnPauseLeaveRoom.addEventListener("click", () => this.requestLeaveRoom());
+    this.btnReturnHome.addEventListener("click", () => this.requestLeaveRoom());
 
     // My List Drawer Toggle
     this.btnHeaderMyList.addEventListener("click", () => this.toggleMyListDrawer());
@@ -426,8 +472,9 @@ class GameController {
     this.btnDiscardSession.addEventListener("click", () => this.discardSession());
 
     // Lobby
-    this.btnCopyCode.addEventListener("click", () => this.copyRoomCode());
-    this.btnShareLink.addEventListener("click", () => this.shareRoomLink());
+    this.lobbyRoomCode.addEventListener("click", () => this.copyRoomInviteLink());
+    this.btnCopyCode.addEventListener("click", () => this.copyRoomInviteLink());
+    this.btnShareLink.addEventListener("click", () => this.copyRoomInviteLink());
     this.categoryOptionBtns.forEach(btn => {
       btn.addEventListener("click", (e) => {
         if (!this.isHost) return;
@@ -435,14 +482,20 @@ class GameController {
         this.setMatchCategory(cat);
       });
     });
+    this.btnSaveCustomCategory.addEventListener("click", () => this.saveCustomCategoryTitle());
+    this.inputCustomCategoryTitle.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") this.saveCustomCategoryTitle();
+    });
+    this.inputCustomCategoryTitle.addEventListener("input", () => this.autoSaveCustomCategory());
     this.btnStartMatch.addEventListener("click", () => this.handleStartMatch());
-    this.btnLeaveRoom.addEventListener("click", () => this.handleLeaveRoom());
 
     // Entry Phase
     this.btnRestoreLastList.addEventListener("click", () => this.restoreLastList());
     this.btnSubmitList.addEventListener("click", () => this.handleSubmitSecretList());
 
     // Game Phase
+    this.btnHostSkipTurn.addEventListener("click", () => this.handleHostSkipTurn());
+    this.btnHostSkipTurnBar.addEventListener("click", () => this.handleHostSkipTurn());
     this.inputTurnGuess.addEventListener("input", (e) => this.handleTurnGuessInput(e.target.value));
     this.inputTurnGuess.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !this.btnSubmitGuess.disabled) {
@@ -456,7 +509,6 @@ class GameController {
     this.btnConfirmWrong.addEventListener("click", () => this.handleConfirmResponse(null));
 
     // Game Over
-    this.btnReturnHome.addEventListener("click", () => this.leaveRoom());
     this.btnPlayAgain.addEventListener("click", () => this.handlePlayAgain());
 
     // Close autocompletes on outside click
@@ -477,11 +529,13 @@ class GameController {
       this.views[viewName].classList.add("active");
     }
 
-    if (viewName === "home") {
+    if (viewName === "home" || !this.currentRoomCode) {
       this.headerRoomTag.classList.add("hidden");
-    } else if (this.currentRoomCode) {
+      if (this.btnHeaderLeave) this.btnHeaderLeave.classList.add("hidden");
+    } else {
       this.headerRoomTag.classList.remove("hidden");
       this.headerRoomCode.textContent = this.currentRoomCode;
+      if (this.btnHeaderLeave) this.btnHeaderLeave.classList.remove("hidden");
     }
   }
 
@@ -495,10 +549,27 @@ class GameController {
   }
 
   // ==========================================================================
-  // SESSION PERSISTENCE & RECONNECTION
+  // URL PARAMS & AUTO-FILL (?room=XXXX)
   // ==========================================================================
 
-  checkSavedSession() {
+  checkUrlRoomParam() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get("room");
+      if (roomParam) {
+        const cleanRoom = roomParam.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+        if (cleanRoom.length === 4 && this.inputRoomCode) {
+          this.inputRoomCode.value = cleanRoom;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // ==========================================================================
+  // SESSION PERSISTENCE, RECONNECTION & AUTO-CLEANUP
+  // ==========================================================================
+
+  async checkSavedSession() {
     const savedId = localStorage.getItem("ta5mena_player_id");
     const savedName = localStorage.getItem("ta5mena_player_name");
     const savedRoom = localStorage.getItem("ta5mena_room_code");
@@ -511,9 +582,8 @@ class GameController {
     if (savedId && savedRoom && savedName) {
       this.reconnectRoomLabel.textContent = savedRoom;
       this.reconnectNameLabel.textContent = savedName;
-      this.reconnectBox.classList.remove("hidden");
-      // Auto-reconnect seamlessly if room and player exist
-      this.handleReconnect(true);
+      // Auto-reconnect seamlessly if room and player exist and are active
+      await this.handleReconnect(true);
     }
   }
 
@@ -532,6 +602,13 @@ class GameController {
     this.reconnectBox.classList.add("hidden");
   }
 
+  async touchRoomActivity(roomCode = this.currentRoomCode) {
+    if (!roomCode) return;
+    try {
+      await db.update(`rooms/${roomCode}`, { lastActivity: Date.now() });
+    } catch (e) {}
+  }
+
   async handleReconnect(isAuto = false) {
     const savedId = localStorage.getItem("ta5mena_player_id");
     const savedName = localStorage.getItem("ta5mena_player_name");
@@ -539,16 +616,44 @@ class GameController {
 
     if (!savedId || !savedRoom || !savedName) return;
 
-    const room = await db.get(`rooms/${savedRoom}`);
+    let room = null;
+    try {
+      room = await db.get(`rooms/${savedRoom}`);
+    } catch (err) {}
+
     if (!room) {
       if (!isAuto) this.showAlert("Room no longer exists.");
       this.discardSession();
+      this.switchView("home");
+      return;
+    }
+
+    // Critical Inactivity & Staleness Checks:
+    // 1. Room inactive > 1 hour (3600000ms)
+    // 2. All players disconnected and room older than 10 minutes (600000ms)
+    const lastActivity = room.lastActivity || room.meta?.createdAt || 0;
+    const isInactive1Hr = (Date.now() - lastActivity) > 3600000;
+    const players = Object.values(room.players || {});
+    const allOffline = players.length === 0 || players.every(p => p.connected === false);
+    const roomAge = Date.now() - (room.meta?.createdAt || lastActivity);
+    const isDead10Min = allOffline && roomAge > 600000;
+
+    if (isInactive1Hr || isDead10Min) {
+      try {
+        await db.remove(`rooms/${savedRoom}`);
+      } catch (e) {}
+      this.discardSession();
+      this.switchView("home");
+      if (!isAuto) {
+        this.showAlert("Previous room expired due to inactivity.");
+      }
       return;
     }
 
     if (!room.players || !room.players[savedId]) {
       if (!isAuto) this.showAlert("Player session not found in this room.");
       this.discardSession();
+      this.switchView("home");
       return;
     }
 
@@ -557,10 +662,28 @@ class GameController {
     this.currentRoomCode = savedRoom;
     this.reconnectBox.classList.add("hidden");
 
+    await this.touchRoomActivity(savedRoom);
     await db.setPlayerConnected(savedRoom, savedId, true);
     await db.trackPlayerConnection(savedRoom, savedId);
     this.subscribeToRoom(savedRoom);
     this.showAlert(`Reconnected to room ${savedRoom} as ${savedName}!`);
+  }
+
+  startLivenessCheck() {
+    setInterval(async () => {
+      if (!this.currentRoomCode || !this.roomData) return;
+      const lastAct = this.roomData.lastActivity || this.roomData.meta?.createdAt || 0;
+      if (Date.now() - lastAct > 3600000) {
+        const code = this.currentRoomCode;
+        if (this.isHost) {
+          try {
+            await db.remove(`rooms/${code}`);
+          } catch (e) {}
+        }
+        this.leaveRoom();
+        this.showAlert("Room closed after 1 hour of inactivity.");
+      }
+    }, 60000);
   }
 
   // ==========================================================================
@@ -592,6 +715,7 @@ class GameController {
     const playerId = this.generatePlayerId();
 
     const initialRoom = {
+      lastActivity: Date.now(),
       meta: {
         code: roomCode,
         hostId: playerId,
@@ -659,6 +783,7 @@ class GameController {
     if (existingPlayer) {
       // Reconnect to existing player seat!
       this.saveSession(existingPlayer.id, existingPlayer.name, code);
+      await this.touchRoomActivity(code);
       await db.setPlayerConnected(code, existingPlayer.id, true);
       await db.trackPlayerConnection(code, existingPlayer.id);
       this.subscribeToRoom(code);
@@ -683,29 +808,82 @@ class GameController {
     };
 
     await db.update(`rooms/${code}/players/${playerId}`, newPlayer);
+    await this.touchRoomActivity(code);
     await db.trackPlayerConnection(code, playerId);
     this.saveSession(playerId, name, code);
     this.subscribeToRoom(code);
   }
 
-  async handleLeaveRoom() {
-    if (!this.currentRoomCode) return;
-    if (this.isHost) {
-      const confirmClose = confirm("You are the Host. Leaving will close the room for everyone. Are you sure?");
-      if (!confirmClose) return;
-      await db.update(`rooms/${this.currentRoomCode}/meta`, {
-        status: "aborted",
-        abortedReason: "The Host left the room. Match closed."
-      });
-    } else {
-      const confirmLeave = confirm("Are you sure you want to leave this room?");
-      if (!confirmLeave) return;
-      await db.remove(`rooms/${this.currentRoomCode}/players/${this.myPlayerId}`);
-      await db.remove(`rooms/${this.currentRoomCode}/lists/${this.myPlayerId}`);
-      if (this.roomData?.meta?.status === "playing") {
-        await this.cleanUpDepartedPlayer(this.myPlayerId, this.myPlayerName);
+  // ==========================================================================
+  // CONFIRMATION MODAL & LEAVE ROOM ENGINE
+  // ==========================================================================
+
+  showConfirmModal({ title, message, confirmText = "CONFIRM", confirmClass = "btn-danger", onConfirm }) {
+    this.confirmModalTitle.textContent = title;
+    this.confirmModalMessage.textContent = message;
+    this.btnModalConfirmAction.textContent = confirmText;
+    this.btnModalConfirmAction.className = `btn btn-block ${confirmClass}`;
+    this.pendingConfirmCallback = onConfirm;
+    this.modalConfirm.classList.add("open");
+  }
+
+  closeConfirmModal() {
+    this.modalConfirm.classList.remove("open");
+    this.pendingConfirmCallback = null;
+  }
+
+  requestLeaveRoom() {
+    this.showConfirmModal({
+      title: "LEAVE ROOM",
+      message: "Leave this room?",
+      confirmText: "LEAVE ROOM",
+      confirmClass: "btn-danger",
+      onConfirm: () => this.executeLeaveRoom()
+    });
+  }
+
+  async executeLeaveRoom() {
+    const roomCode = this.currentRoomCode;
+    const playerId = this.myPlayerId;
+    const playerName = this.myPlayerName;
+    if (!roomCode || !playerId) {
+      this.leaveRoom();
+      return;
+    }
+
+    const room = await db.get(`rooms/${roomCode}`);
+    if (room && room.players) {
+      const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
+      if (remainingPlayers.length === 0) {
+        // No players remaining: delete entire room node
+        try {
+          await db.remove(`rooms/${roomCode}`);
+        } catch (e) {}
+      } else {
+        const updates = {};
+        updates[`players/${playerId}`] = null;
+        updates[`lists/${playerId}`] = null;
+        updates[`lastActivity`] = Date.now();
+
+        // Host Migration: assign host to next connected player so room never becomes hostless
+        if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
+          const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
+          updates[`players/${nextHost.id}/isHost`] = true;
+          updates[`meta/hostId`] = nextHost.id;
+          updates[`game/lastAction`] = {
+            text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
+            timestamp: Date.now()
+          };
+        }
+
+        await db.update(`rooms/${roomCode}`, updates);
+
+        if (room.meta && room.meta.status === "playing") {
+          await this.cleanUpDepartedPlayer(playerId, playerName);
+        }
       }
     }
+
     this.leaveRoom();
   }
 
@@ -720,12 +898,15 @@ class GameController {
     this.discardSession();
     this.currentRoomCode = null;
     this.roomData = null;
+    this.isHost = false;
     this.btnHeaderMyList?.classList.add("hidden");
+    this.btnHeaderLeave?.classList.add("hidden");
     this.modalMyList?.classList.remove("open");
     if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
     if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
     this.hidePauseOverlay();
     this.closeGiveHintModal();
+    this.closeConfirmModal();
     this.switchView("home");
   }
 
@@ -761,7 +942,20 @@ class GameController {
         return;
       }
 
-      this.isHost = me.isHost || (room.meta.hostId === this.myPlayerId);
+      // Host auto-migration safeguard if room has no valid host
+      const playersList = Object.values(room.players || {});
+      const hasHost = playersList.some(p => p.isHost === true) || (room.meta && room.players[room.meta.hostId]);
+      if (!hasHost && playersList.length > 0) {
+        const nextHost = playersList.find(p => p.connected === true) || playersList[0];
+        if (nextHost.id === this.myPlayerId) {
+          db.update(`rooms/${this.currentRoomCode}`, {
+            [`players/${this.myPlayerId}/isHost`]: true,
+            "meta/hostId": this.myPlayerId
+          });
+        }
+      }
+
+      this.isHost = me.isHost || (room.meta && room.meta.hostId === this.myPlayerId);
       this.category = room.meta.category || "singers";
 
       // Check pause state: if any player has connected === false during match, show pause overlay
@@ -831,26 +1025,8 @@ class GameController {
     }
   }
 
-  async handleKickDisconnectedPlayer(kickedId, kickedName) {
-    if (!this.isHost || !this.currentRoomCode) return;
-    const confirmKick = confirm(`Are you sure you want to kick ${kickedName} and continue the match?`);
-    if (!confirmKick) return;
-
-    await db.remove(`rooms/${this.currentRoomCode}/players/${kickedId}`);
-    await db.remove(`rooms/${this.currentRoomCode}/lists/${kickedId}`);
-
-    const room = this.roomData;
-    if (!room) return;
-
-    if (room.meta.status === "playing") {
-      await this.cleanUpDepartedPlayer(kickedId, kickedName);
-    } else if (room.meta.status === "entry") {
-      const remaining = Object.values(room.players || {}).filter(p => p.id !== kickedId);
-      if (remaining.length >= 2 && remaining.every(p => p.listSubmitted)) {
-        await this.checkAllListsSubmitted(room);
-      }
-    }
-    this.showAlert(`${kickedName} was removed. Match resuming.`);
+  handleKickDisconnectedPlayer(kickedId, kickedName) {
+    this.handleKickPlayer(kickedId, kickedName);
   }
 
   async cleanUpDepartedPlayer(kickedId, kickedName) {
@@ -998,6 +1174,7 @@ class GameController {
       text: `${this.myPlayerName} dropped a hint for their #${rank} slot!`,
       timestamp: Date.now()
     };
+    updates["lastActivity"] = Date.now();
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
     this.closeGiveHintModal();
@@ -1048,7 +1225,7 @@ class GameController {
   // ==========================================================================
 
   renderLobby(room) {
-    this.lobbyRoomCode.textContent = room.meta.code;
+    this.lobbyRoomCode.innerHTML = `${room.meta.code} <span class="tap-copy-badge">TAP TO COPY</span>`;
     const players = Object.values(room.players || {});
     const playerCount = players.length;
 
@@ -1064,6 +1241,34 @@ class GameController {
       }
       btn.style.cursor = this.isHost ? "pointer" : "default";
     });
+
+    // Custom Category Box
+    if (room.meta.category === "custom") {
+      this.customCategoryBox.classList.remove("hidden");
+      const currentTitle = room.meta.customCategory || "";
+      if (this.isHost) {
+        this.inputCustomCategoryTitle.disabled = false;
+        this.btnSaveCustomCategory.classList.remove("hidden");
+        if (!this.inputCustomCategoryTitle.matches(":focus")) {
+          this.inputCustomCategoryTitle.value = currentTitle;
+        }
+        this.customCategoryStatus.textContent = currentTitle.trim() ? "TOPIC SET" : "REQUIRED";
+        this.customCategoryStatus.className = currentTitle.trim() ? "badge badge-success" : "badge badge-accent";
+        this.customCategoryDisplayNote.classList.add("hidden");
+      } else {
+        this.inputCustomCategoryTitle.disabled = true;
+        this.inputCustomCategoryTitle.value = currentTitle || "Custom Topic";
+        this.btnSaveCustomCategory.classList.add("hidden");
+        this.customCategoryStatus.textContent = "HOST CHOICE";
+        this.customCategoryStatus.className = "badge";
+        this.customCategoryDisplayNote.textContent = currentTitle 
+          ? `Host topic: "${currentTitle}"` 
+          : "Host is choosing a topic...";
+        this.customCategoryDisplayNote.classList.remove("hidden");
+      }
+    } else {
+      this.customCategoryBox.classList.add("hidden");
+    }
 
     if (this.isHost) {
       this.categoryBadgeNote.textContent = "HOST SELECTS";
@@ -1122,6 +1327,37 @@ class GameController {
   async setMatchCategory(cat) {
     if (!this.isHost || !this.currentRoomCode) return;
     await db.update(`rooms/${this.currentRoomCode}/meta`, { category: cat });
+    await this.touchRoomActivity();
+  }
+
+  async saveCustomCategoryTitle() {
+    if (!this.isHost || !this.currentRoomCode) return;
+    const title = this.inputCustomCategoryTitle.value.trim();
+    if (!title) {
+      this.showAlert("Please type a topic title.");
+      this.inputCustomCategoryTitle.focus();
+      return;
+    }
+    await db.update(`rooms/${this.currentRoomCode}/meta`, {
+      customCategory: title
+    });
+    await this.touchRoomActivity();
+    this.showAlert(`Custom topic set to: ${title}`);
+  }
+
+  autoSaveCustomCategory() {
+    if (!this.isHost || !this.currentRoomCode) return;
+    const title = this.inputCustomCategoryTitle.value.trim();
+    if (this.customCategoryAutoSaveTimeout) {
+      clearTimeout(this.customCategoryAutoSaveTimeout);
+    }
+    this.customCategoryAutoSaveTimeout = setTimeout(async () => {
+      if (!this.currentRoomCode) return;
+      await db.update(`rooms/${this.currentRoomCode}/meta`, {
+        customCategory: title
+      });
+      await this.touchRoomActivity();
+    }, 600);
   }
 
   async handleStartMatch() {
@@ -1132,20 +1368,36 @@ class GameController {
       return;
     }
 
+    if (this.roomData.meta?.category === "custom" && !(this.roomData.meta?.customCategory || "").trim()) {
+      this.showAlert("Please enter a custom topic title before starting.");
+      if (this.inputCustomCategoryTitle) this.inputCustomCategoryTitle.focus();
+      return;
+    }
+
     await db.update(`rooms/${this.currentRoomCode}/meta`, { status: "entry" });
+    await this.touchRoomActivity();
   }
 
-  async handleKickPlayer(kickedPlayerId, kickedPlayerName) {
+  handleKickPlayer(kickedPlayerId, kickedPlayerName) {
+    if (!this.isHost || !this.currentRoomCode || kickedPlayerId === this.myPlayerId) return;
+    this.showConfirmModal({
+      title: "REMOVE PLAYER",
+      message: `Remove ${kickedPlayerName} from the room?`,
+      confirmText: "KICK PLAYER",
+      confirmClass: "btn-danger",
+      onConfirm: () => this.executeKickPlayer(kickedPlayerId, kickedPlayerName)
+    });
+  }
+
+  async executeKickPlayer(kickedPlayerId, kickedPlayerName) {
     if (!this.isHost || !this.currentRoomCode || kickedPlayerId === this.myPlayerId) return;
 
     const room = this.roomData;
     if (!room || !room.players || !room.players[kickedPlayerId]) return;
 
-    const confirmKick = confirm(`Are you sure you want to remove ${kickedPlayerName}?`);
-    if (!confirmKick) return;
-
     await db.remove(`rooms/${this.currentRoomCode}/players/${kickedPlayerId}`);
     await db.remove(`rooms/${this.currentRoomCode}/lists/${kickedPlayerId}`);
+    await this.touchRoomActivity();
 
     if (room.meta && room.meta.status === "playing") {
       await this.cleanUpDepartedPlayer(kickedPlayerId, kickedPlayerName);
@@ -1159,36 +1411,47 @@ class GameController {
     this.showAlert(`Removed ${kickedPlayerName}.`);
   }
 
-  copyRoomCode() {
+  copyRoomInviteLink() {
     if (!this.currentRoomCode) return;
-    navigator.clipboard.writeText(this.currentRoomCode).then(() => {
-      this.showAlert(`Room code ${this.currentRoomCode} copied to clipboard.`);
-    }).catch(() => {
-      this.showAlert(`Room code: ${this.currentRoomCode}`);
-    });
+    const inviteUrl = window.location.origin + window.location.pathname + `?room=${this.currentRoomCode}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        this.showAlert("COPIED INVITE LINK");
+      }).catch(() => {
+        this.copyFallback(inviteUrl);
+      });
+    } else {
+      this.copyFallback(inviteUrl);
+    }
+  }
+
+  copyFallback(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      this.showAlert("COPIED INVITE LINK");
+    } catch (err) {}
+    document.body.removeChild(ta);
+  }
+
+  copyRoomCode() {
+    this.copyRoomInviteLink();
   }
 
   shareRoomLink() {
-    if (!this.currentRoomCode) return;
-    const url = window.location.origin + window.location.pathname + `?room=${this.currentRoomCode}`;
-    if (navigator.share) {
-      navigator.share({
-        title: "Join Ta5mena Room",
-        text: `Join my Top 10 game on Ta5mena! Room code: ${this.currentRoomCode}`,
-        url: url
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(url).then(() => {
-        this.showAlert("Invite link copied to clipboard.");
-      });
-    }
+    this.copyRoomInviteLink();
   }
 
   // ==========================================================================
   // VIEW 3: SECRET LIST ENTRY PHASE LOGIC
   // ==========================================================================
 
-  getCategoryTitle(cat) {
+  getCategoryTitle(cat, customTitle) {
     if (cat === "singers") return "Singers";
     if (cat === "football") return "Footballers";
     if (cat === "actors") return "Actors";
@@ -1197,6 +1460,9 @@ class GameController {
     if (cat === "series") return "Series";
     if (cat === "movies") return "Movies";
     if (cat === "foods") return "Foods";
+    if (cat === "custom") {
+      return customTitle || this.roomData?.meta?.customCategory || "Custom Topic";
+    }
     return "Category";
   }
 
@@ -1542,6 +1808,12 @@ class GameController {
     this.handleConfirmationState(room);
 
     // Active vs Passive Turn Control
+    if (this.isHost) {
+      this.btnHostSkipTurnBar.classList.remove("hidden");
+    } else {
+      this.btnHostSkipTurnBar.classList.add("hidden");
+    }
+
     if (isMyTurn) {
       this.activeTurnControl.classList.remove("hidden");
       this.passiveTurnBanner.classList.add("hidden");
@@ -1551,6 +1823,7 @@ class GameController {
       this.passiveTurnBanner.classList.remove("hidden");
       const activeP = players[activePlayerId];
       this.passiveActivePlayerName.textContent = activeP ? activeP.name : "Player";
+      this.btnHostSkipTurn.classList.toggle("hidden", !this.isHost);
     }
 
     // Opponent tabs bar & Board slots
@@ -1565,8 +1838,57 @@ class GameController {
   }
 
   // --------------------------------------------------------------------------
+  // HOST SKIP TURN LOGIC
+  // --------------------------------------------------------------------------
+
+  handleHostSkipTurn() {
+    if (!this.isHost || !this.roomData || this.roomData.meta?.status !== "playing") return;
+    const game = this.roomData.game || {};
+    const turnOrder = game.turnOrder || [];
+    const activePlayerId = game.activePlayerId || turnOrder[game.currentTurnIndex || 0];
+    const activeP = this.roomData.players ? this.roomData.players[activePlayerId] : null;
+    const activeName = activeP ? activeP.name : "Current Player";
+
+    this.showConfirmModal({
+      title: "SKIP TURN",
+      message: `Skip ${activeName}'s turn?`,
+      confirmText: "SKIP TURN",
+      confirmClass: "btn-danger",
+      onConfirm: () => this.executeSkipTurn(activePlayerId, activeName)
+    });
+  }
+
+  async executeSkipTurn(activePlayerId, activePlayerName) {
+    if (!this.isHost || !this.currentRoomCode) return;
+    const updates = {
+      "game/confirmation": null,
+      "game/lastAction": {
+        text: `Host skipped ${activePlayerName}'s turn.`,
+        timestamp: Date.now()
+      },
+      "lastActivity": Date.now()
+    };
+    await db.update(`rooms/${this.currentRoomCode}`, updates);
+    await this.advanceTurn();
+    this.showAlert(`Skipped ${activePlayerName}'s turn.`);
+  }
+
+  // --------------------------------------------------------------------------
   // TARGET SELECTOR & GUESS CONTROLS
   // --------------------------------------------------------------------------
+
+  renderMissedGuesses(boxEl, listEl, missedList) {
+    if (!boxEl || !listEl) return;
+    if (!missedList || missedList.length === 0) {
+      boxEl.classList.add("hidden");
+      listEl.innerHTML = "";
+      return;
+    }
+    boxEl.classList.remove("hidden");
+    listEl.innerHTML = missedList.map(item => `
+      <span class="missed-guess-tag">${this.escapeHtml(item)}</span>
+    `).join("");
+  }
 
   renderTargetPlayerSelector(room) {
     const players = room.players || {};
@@ -1615,6 +1937,17 @@ class GameController {
 
       this.targetPlayerGrid.appendChild(btn);
     });
+
+    // Render missed guesses on the targeted player
+    if (this.selectedTargetPlayerId && players[this.selectedTargetPlayerId]) {
+      const targetP = players[this.selectedTargetPlayerId];
+      const missedList = targetP.missedGuesses 
+        ? (Array.isArray(targetP.missedGuesses) ? targetP.missedGuesses : Object.values(targetP.missedGuesses))
+        : [];
+      this.renderMissedGuesses(this.targetMissedGuessesBox, this.targetMissedGuessesList, missedList);
+    } else {
+      this.targetMissedGuessesBox.classList.add("hidden");
+    }
 
     this.updateSubmitButtonState();
   }
@@ -1682,16 +2015,28 @@ class GameController {
 
     if (!targetPlayerId || !guessText) return;
 
+    const targetList = this.roomData.lists ? this.roomData.lists[targetPlayerId] : null;
+    const targetPlayer = this.roomData.players ? this.roomData.players[targetPlayerId] : null;
+    const myPlayer = this.roomData.players ? this.roomData.players[this.myPlayerId] : null;
+
+    if (!targetList || !targetPlayer || !myPlayer) return;
+
+    const normGuess = normalizeText(guessText);
+
+    // Prevent duplicate wrong guesses on this target player
+    const missedList = targetPlayer.missedGuesses 
+      ? (Array.isArray(targetPlayer.missedGuesses) ? targetPlayer.missedGuesses : Object.values(targetPlayer.missedGuesses))
+      : [];
+    const alreadyMissed = missedList.some(item => normalizeText(item) === normGuess);
+    if (alreadyMissed) {
+      this.showAlert("Already guessed on this player! Pick another name.");
+      return;
+    }
+
     // Reset input
     this.inputTurnGuess.value = "";
     this.turnAutocompleteDropdown.classList.remove("open");
     this.btnSubmitGuess.disabled = true;
-
-    const targetList = this.roomData.lists ? this.roomData.lists[targetPlayerId] : null;
-    const targetPlayer = this.roomData.players[targetPlayerId];
-    const myPlayer = this.roomData.players[this.myPlayerId];
-
-    if (!targetList || !targetPlayer) return;
 
     // Filter unrevealed slots on target's list
     const unrevealedSlots = [];
@@ -1700,8 +2045,6 @@ class GameController {
         unrevealedSlots.push({ rank: r, ...targetList[r] });
       }
     }
-
-    const normGuess = normalizeText(guessText);
 
     // ========================================================================
     // LAYER 1: EXACT NORMALIZED MATCH
@@ -1784,6 +2127,7 @@ class GameController {
       text: actionText,
       timestamp: Date.now()
     };
+    updates["lastActivity"] = Date.now();
 
     // Check if target's list is completely revealed
     const targetList = this.roomData.lists[targetPlayerId];
@@ -1912,6 +2256,7 @@ class GameController {
         text: actionText,
         timestamp: Date.now()
       };
+      updates["lastActivity"] = Date.now();
 
       // Check if my list is now complete
       let remaining = 0;
@@ -1928,12 +2273,29 @@ class GameController {
     } else {
       // Missed guess ("Not on my list")
       const actionText = `${confirmation.fromPlayerName} missed on ${confirmation.toPlayerName}'s list (0 pts)`;
-      await db.update(`rooms/${this.currentRoomCode}/game`, {
-        lastAction: {
+      const guessText = confirmation.guessText;
+      const targetId = confirmation.toPlayerId;
+      const targetPlayer = this.roomData.players ? this.roomData.players[targetId] : null;
+
+      const currentMissed = targetPlayer?.missedGuesses 
+        ? (Array.isArray(targetPlayer.missedGuesses) ? [...targetPlayer.missedGuesses] : Object.values(targetPlayer.missedGuesses))
+        : [];
+
+      const normG = normalizeText(guessText);
+      if (!currentMissed.some(mg => normalizeText(mg) === normG)) {
+        currentMissed.push(guessText);
+      }
+
+      const updates = {
+        "game/lastAction": {
           text: actionText,
           timestamp: Date.now()
-        }
-      });
+        },
+        "lastActivity": Date.now()
+      };
+      updates[`players/${targetId}/missedGuesses`] = currentMissed;
+
+      await db.update(`rooms/${this.currentRoomCode}`, updates);
     }
 
     // Advance turn and clear confirmation
@@ -2017,6 +2379,16 @@ class GameController {
           });
         }
       }
+    }
+
+    // Render missed guesses on viewed board
+    if (!this.isViewingMySecretList && player) {
+      const missedList = player.missedGuesses 
+        ? (Array.isArray(player.missedGuesses) ? player.missedGuesses : Object.values(player.missedGuesses))
+        : [];
+      this.renderMissedGuesses(this.boardMissedGuessesBox, this.boardMissedGuessesList, missedList);
+    } else {
+      this.boardMissedGuessesBox.classList.add("hidden");
     }
 
     let hiddenCount = 0;
