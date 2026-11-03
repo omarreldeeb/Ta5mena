@@ -501,7 +501,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW 5: LIVE TARGET CONFIRMATION POPUP (LAYER 3 FALLBACK) -->
     <!-- ===================================================================== -->
-    <div id="modal-confirmation" class="modal-backdrop">
+    <div id="modal-confirmation" class="modal-backdrop hidden">
       <div class="confirm-modal-box">
         <div class="flex-between">
           <span style="font-size: 13px; font-weight: 800; font-family: var(--font-mono); color: var(--accent);">TARGET CONFIRMATION NEEDED</span>
@@ -531,7 +531,7 @@
     </div>
 
     <!-- Spectator Waiting Confirmation Banner (Shown when other players are waiting for confirmation) -->
-    <div id="waiting-confirmation-backdrop" class="modal-backdrop">
+    <div id="waiting-confirmation-backdrop" class="modal-backdrop hidden">
       <div class="confirm-modal-box" style="text-align: center;">
         <span class="badge badge-accent" style="align-self: center;">VERIFICATION IN PROGRESS</span>
         <div style="font-size: 15px; font-weight: 600; margin-top: 8px;">
@@ -588,7 +588,7 @@
     <!-- ===================================================================== -->
     <!-- MY LIST OVERLAY / DRAWER -->
     <!-- ===================================================================== -->
-    <div id="modal-my-list" class="modal-backdrop">
+    <div id="modal-my-list" class="modal-backdrop hidden">
       <div class="confirm-modal-box" style="max-width: 480px;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -613,7 +613,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: GAME PAUSED OVERLAY (DISCONNECT PAUSE) -->
     <!-- ===================================================================== -->
-    <div id="modal-pause-overlay" class="modal-backdrop">
+    <div id="modal-pause-overlay" class="modal-backdrop hidden">
       <div class="confirm-modal-box pause-modal-box">
         <div class="flex-between">
           <span class="badge badge-accent">MATCH PAUSED</span>
@@ -652,7 +652,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: GIVE HINT MODAL -->
     <!-- ===================================================================== -->
-    <div id="modal-give-hint" class="modal-backdrop">
+    <div id="modal-give-hint" class="modal-backdrop hidden">
       <div class="confirm-modal-box" style="max-width: 480px;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
           <div>
@@ -696,7 +696,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: HINTS HUB MODAL (10 SLOTS WITH 3 QUICK ONE-TAP BUTTONS) -->
     <!-- ===================================================================== -->
-    <div id="modal-hints-hub" class="modal-backdrop">
+    <div id="modal-hints-hub" class="modal-backdrop hidden">
       <div class="confirm-modal-box hints-modal-box" style="max-width: 680px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -733,7 +733,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: REUSABLE SHARP CONFIRMATION MODAL -->
     <!-- ===================================================================== -->
-    <div id="modal-confirm" class="modal-backdrop modal-confirm-backdrop">
+    <div id="modal-confirm" class="modal-backdrop modal-confirm-backdrop hidden">
       <div class="confirm-modal-box sharp-modal-box">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
           <span id="confirm-modal-title" style="font-size: 13px; font-weight: 800; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent);">CONFIRM ACTION</span>
@@ -752,8 +752,11 @@
     <!-- ===================================================================== -->
     <!-- VIEW: PRIVACY INTERSTITIAL ("PASS PHONE" CURTAIN) -->
     <!-- ===================================================================== -->
-    <div id="modal-privacy-curtain" class="modal-backdrop modal-privacy-backdrop">
+    <div id="modal-privacy-curtain" class="modal-backdrop modal-privacy-backdrop hidden">
       <div class="privacy-curtain-card">
+        <button id="btn-privacy-curtain-cancel" type="button" class="privacy-curtain-cancel-btn" title="Cancel and return to Home Screen">
+          ✕ EXIT TO HOME
+        </button>
         <span class="badge badge-accent mb-12" style="font-weight: 800; letter-spacing: 0.5px;">1-DEVICE PASS & PLAY</span>
         <div class="privacy-curtain-icon-wrap">
           <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#FF4D00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -776,14 +779,14 @@
     <!-- ===================================================================== -->
     <!-- VIEW: 1-DEVICE PRIVACY REVEAL WARNING MODAL (FOR MY LIST & HINTS) -->
     <!-- ===================================================================== -->
-    <div id="modal-local-reveal-confirm" class="modal-backdrop">
+    <div id="modal-local-reveal-confirm" class="modal-backdrop hidden">
       <div class="confirm-modal-box sharp-modal-box" style="max-width: 440px; width: 92%;">
         <div class="flex-between mb-8" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
           <span class="badge badge-accent">CONFIRM PRIVATE VIEW</span>
           <span id="local-reveal-player-tag" style="font-weight: 700; font-size: 13px;">Player Name</span>
         </div>
-        <h3 id="local-reveal-title" style="font-size: 16px; margin-bottom: 6px;">Reveal Secret List?</h3>
-        <p id="local-reveal-msg" class="text-secondary" style="font-size: 13px; margin-bottom: 16px;">
+        <h3 id="local-reveal-confirm-title" style="font-size: 16px; margin-bottom: 6px;">Reveal Secret List?</h3>
+        <p id="local-reveal-confirm-message" class="text-secondary" style="font-size: 13px; margin-bottom: 16px;">
           Make sure your friends are looking away from your screen before opening your private picks!
         </p>
         <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -796,7 +799,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: 1-DEVICE LAYER 3 VERIFICATION CHOICE MODAL -->
     <!-- ===================================================================== -->
-    <div id="modal-local-verify-choice" class="modal-backdrop">
+    <div id="modal-local-verify-choice" class="modal-backdrop hidden">
       <div class="confirm-modal-box" style="max-width: 520px; width: 95%;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
           <div>
@@ -846,7 +849,7 @@
     <!-- ===================================================================== -->
     <!-- VIEW: 1-DEVICE SECRET TARGET SLOTS MODAL -->
     <!-- ===================================================================== -->
-    <div id="modal-local-secret-target-slots" class="modal-backdrop">
+    <div id="modal-local-secret-target-slots" class="modal-backdrop hidden">
       <div class="confirm-modal-box" style="max-width: 520px; width: 95%;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
           <div>

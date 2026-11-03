@@ -493,11 +493,12 @@ class GameController {
     this.privacyCurtainPlayerName = document.getElementById("privacy-curtain-player-name");
     this.privacyCurtainActionName = document.getElementById("privacy-curtain-action-name");
     this.btnPrivacyCurtainProceed = document.getElementById("btn-privacy-curtain-proceed");
+    this.btnPrivacyCurtainCancel = document.getElementById("btn-privacy-curtain-cancel");
 
     // Local Protected Reveal Confirmation Modal (My List & Hints in Pass & Play)
     this.modalLocalRevealConfirm = document.getElementById("modal-local-reveal-confirm");
-    this.localRevealConfirmTitle = document.getElementById("local-reveal-confirm-title");
-    this.localRevealConfirmMessage = document.getElementById("local-reveal-confirm-message");
+    this.localRevealConfirmTitle = document.getElementById("local-reveal-confirm-title") || document.getElementById("local-reveal-title");
+    this.localRevealConfirmMessage = document.getElementById("local-reveal-confirm-message") || document.getElementById("local-reveal-msg");
     this.btnLocalRevealConfirm = document.getElementById("btn-local-reveal-confirm");
     this.btnLocalRevealCancel = document.getElementById("btn-local-reveal-cancel");
 
@@ -527,12 +528,12 @@ class GameController {
     this.btnCloseAlert?.addEventListener("pointerdown", onDismissToast);
 
     // Reusable Confirmation Modal
-    this.btnModalCancel.addEventListener("click", () => this.closeConfirmModal());
-    this.btnCloseConfirmModal.addEventListener("click", () => this.closeConfirmModal());
-    this.modalConfirm.addEventListener("click", (e) => {
+    this.btnModalCancel?.addEventListener("click", () => this.closeConfirmModal());
+    this.btnCloseConfirmModal?.addEventListener("click", () => this.closeConfirmModal());
+    this.modalConfirm?.addEventListener("click", (e) => {
       if (e.target === this.modalConfirm) this.closeConfirmModal();
     });
-    this.btnModalConfirmAction.addEventListener("click", () => {
+    this.btnModalConfirmAction?.addEventListener("click", () => {
       if (this.pendingConfirmCallback) {
         const cb = this.pendingConfirmCallback;
         this.closeConfirmModal();
@@ -567,9 +568,9 @@ class GameController {
           this.executeLeaveRoom();
         }
       };
-      this.btnHeaderLeave.addEventListener("pointerdown", onHeaderLeaveClick);
-      this.btnHeaderLeave.addEventListener("mousedown", onHeaderLeaveClick);
-      this.btnHeaderLeave.addEventListener("click", onHeaderLeaveClick);
+      this.btnHeaderLeave?.addEventListener("pointerdown", onHeaderLeaveClick);
+      this.btnHeaderLeave?.addEventListener("mousedown", onHeaderLeaveClick);
+      this.btnHeaderLeave?.addEventListener("click", onHeaderLeaveClick);
     }
 
     // Window navigation sync
@@ -639,52 +640,52 @@ class GameController {
     });
 
     // Give Hint Modal Events
-    this.btnCloseGiveHint.addEventListener("click", () => this.closeGiveHintModal());
-    this.modalGiveHint.addEventListener("click", (e) => {
+    this.btnCloseGiveHint?.addEventListener("click", () => this.closeGiveHintModal());
+    this.modalGiveHint?.addEventListener("click", (e) => {
       if (e.target === this.modalGiveHint) this.closeGiveHintModal();
     });
-    this.btnHintFirstLetter.addEventListener("click", () => this.submitFirstLetterHint());
-    this.btnHintWordCount.addEventListener("click", () => this.submitWordCountHint());
-    this.btnSubmitCustomHint.addEventListener("click", () => this.submitCustomHint());
-    this.inputCustomHint.addEventListener("keydown", (e) => {
+    this.btnHintFirstLetter?.addEventListener("click", () => this.submitFirstLetterHint());
+    this.btnHintWordCount?.addEventListener("click", () => this.submitWordCountHint());
+    this.btnSubmitCustomHint?.addEventListener("click", () => this.submitCustomHint());
+    this.inputCustomHint?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") this.submitCustomHint();
     });
 
     // Home
-    this.btnCreateRoom.addEventListener("click", () => this.handleCreateRoom());
-    this.btnJoinRoom.addEventListener("click", () => this.handleJoinRoom());
-    this.inputRoomCode.addEventListener("input", (e) => {
+    this.btnCreateRoom?.addEventListener("click", () => this.handleCreateRoom());
+    this.btnJoinRoom?.addEventListener("click", () => this.handleJoinRoom());
+    this.inputRoomCode?.addEventListener("input", (e) => {
       e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
     });
-    this.inputRoomCode.addEventListener("keydown", (e) => {
+    this.inputRoomCode?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         this.handleJoinRoom();
       }
     });
-    this.btnReconnect.addEventListener("click", () => this.handleReconnect());
-    this.btnDiscardSession.addEventListener("click", () => this.discardSession());
+    this.btnReconnect?.addEventListener("click", () => this.handleReconnect());
+    this.btnDiscardSession?.addEventListener("click", () => this.discardSession());
 
     // Lobby
-    this.lobbyRoomCode.addEventListener("click", () => this.copyRoomInviteLink());
-    this.btnCopyCode.addEventListener("click", () => this.copyRoomInviteLink());
-    this.btnShareLink.addEventListener("click", () => this.copyRoomInviteLink());
-    this.categoryOptionBtns.forEach(btn => {
-      btn.addEventListener("click", (e) => {
+    this.lobbyRoomCode?.addEventListener("click", () => this.copyRoomInviteLink());
+    this.btnCopyCode?.addEventListener("click", () => this.copyRoomInviteLink());
+    this.btnShareLink?.addEventListener("click", () => this.copyRoomInviteLink());
+    this.categoryOptionBtns?.forEach(btn => {
+      btn?.addEventListener("click", (e) => {
         if (!this.isHost) return;
         const cat = e.currentTarget.dataset.category;
         this.setMatchCategory(cat);
       });
     });
-    this.btnSaveCustomCategory.addEventListener("click", () => this.saveCustomCategoryTitle());
-    this.inputCustomCategoryTitle.addEventListener("keydown", (e) => {
+    this.btnSaveCustomCategory?.addEventListener("click", () => this.saveCustomCategoryTitle());
+    this.inputCustomCategoryTitle?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") this.saveCustomCategoryTitle();
     });
-    this.inputCustomCategoryTitle.addEventListener("input", () => this.autoSaveCustomCategory());
-    this.btnStartMatch.addEventListener("click", () => this.handleStartMatch());
+    this.inputCustomCategoryTitle?.addEventListener("input", () => this.autoSaveCustomCategory());
+    this.btnStartMatch?.addEventListener("click", () => this.handleStartMatch());
 
     // Entry Phase
-    this.btnRestoreLastList.addEventListener("click", () => this.restoreLastList());
-    this.btnSubmitList.addEventListener("click", () => this.handleSubmitSecretList());
+    this.btnRestoreLastList?.addEventListener("click", () => this.restoreLastList());
+    this.btnSubmitList?.addEventListener("click", () => this.handleSubmitSecretList());
 
     // Game Phase Skip Turn (Immediate execution, bypass broken modals)
     const onHostSkip = (e) => {
@@ -714,13 +715,13 @@ class GameController {
       }
     });
 
-    this.inputTurnGuess.addEventListener("input", (e) => this.handleTurnGuessInput(e.target.value));
-    this.inputTurnGuess.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !this.btnSubmitGuess.disabled) {
+    this.inputTurnGuess?.addEventListener("input", (e) => this.handleTurnGuessInput(e.target.value));
+    this.inputTurnGuess?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !this.btnSubmitGuess?.disabled) {
         this.handleSubmitTurnGuess();
       }
     });
-    this.btnSubmitGuess.addEventListener("click", () => this.handleSubmitTurnGuess());
+    this.btnSubmitGuess?.addEventListener("click", () => this.handleSubmitTurnGuess());
     this.btnToggleMyList?.addEventListener("click", () => {
       if (this.isLocalMode) {
         const activeName = this.localMatch?.players?.[this.myPlayerId]?.name || "Active Player";
@@ -735,25 +736,30 @@ class GameController {
     });
 
     // Confirmation Layer 3
-    this.btnConfirmWrong.addEventListener("click", () => this.handleConfirmResponse(null));
+    this.btnConfirmWrong?.addEventListener("click", () => this.handleConfirmResponse(null));
 
     // Game Over
-    this.btnPlayAgain.addEventListener("click", () => this.handlePlayAgain());
+    this.btnPlayAgain?.addEventListener("click", () => this.handlePlayAgain());
+    this.btnReturnHome?.addEventListener("click", () => this.switchView("home"));
 
     // 1-Device Pass & Play Mode Selectors & Controls
     this.tabModeOnline?.addEventListener("click", () => this.switchHomeMode("online"));
     this.tabModeLocal?.addEventListener("click", () => this.switchHomeMode("local"));
     this.btnLocalCountMinus?.addEventListener("click", () => this.adjustLocalPlayerCount(-1));
     this.btnLocalCountPlus?.addEventListener("click", () => this.adjustLocalPlayerCount(1));
-    this.localCategoryBtns.forEach(btn => {
-      btn.addEventListener("click", (e) => this.selectLocalCategory(e.currentTarget.dataset.category));
+    this.localCategoryBtns?.forEach(btn => {
+      btn?.addEventListener("click", (e) => this.selectLocalCategory(e.currentTarget.dataset.category));
     });
     this.btnStartLocalMatch?.addEventListener("click", () => this.startLocalMatch());
     this.btnLocalResume?.addEventListener("click", () => this.resumeLocalMatch());
     this.btnLocalDiscard?.addEventListener("click", () => this.discardLocalMatch());
 
-    // Privacy Curtain Proceed
+    // Privacy Curtain Proceed & Cancel
     this.btnPrivacyCurtainProceed?.addEventListener("click", () => this.handlePrivacyCurtainProceed());
+    this.btnPrivacyCurtainCancel?.addEventListener("click", () => {
+      this.closePrivacyCurtain();
+      this.executeLeaveLocalMatch();
+    });
 
     // Local Reveal Confirm
     this.btnLocalRevealCancel?.addEventListener("click", () => this.closeLocalRevealConfirm());
@@ -1048,13 +1054,50 @@ class GameController {
   }
 
   async initAppRouting() {
+    // 1. Explicitly hide every modal and overlay on page load so none can block the Home Screen
+    document.querySelectorAll(".modal-backdrop").forEach(modal => {
+      modal.classList.remove("open");
+      modal.classList.add("hidden");
+    });
+    this.closePrivacyCurtain();
+    this.closeConfirmModal();
+    this.closeHintsHubModal();
+    this.closeGiveHintModal();
+    this.toggleMyListDrawer(false);
+    this.closeLocalRevealConfirm();
+    this.closeLocalVerifyChoiceModal();
+    this.closeLocalSecretTargetSlotsModal();
+
+    // 2. Clear broken or corrupted local match state from localStorage
+    const rawLocal = localStorage.getItem("ta5mena_local_match");
+    if (rawLocal) {
+      try {
+        const parsed = JSON.parse(rawLocal);
+        if (!parsed || typeof parsed !== "object" || !parsed.players || typeof parsed.players !== "object" || Object.keys(parsed.players).length < 2 || !parsed.meta) {
+          localStorage.removeItem("ta5mena_local_match");
+        }
+      } catch (e) {
+        localStorage.removeItem("ta5mena_local_match");
+      }
+    }
+
+    // 3. Reset any in-memory local match state on boot so user is never trapped in a black screen
+    this.isLocalMode = false;
+    this.localMatch = null;
+    this.localCurtainProceedCallback = null;
+    this.localPendingVerify = null;
+
+    // 4. Always boot to Tab 1: ONLINE MULTIPLAYER active by default
+    this.switchHomeMode("online");
+
+    // 5. Populate saved online player name
     const savedName = localStorage.getItem("ta5mena_player_name");
-    if (savedName) {
+    if (savedName && this.inputPlayerName) {
       this.inputPlayerName.value = savedName;
       this.myPlayerName = savedName;
     }
 
-    // Initialize local setup defaults
+    // 6. Initialize local setup defaults and check if valid saved match exists for the resume button
     this.renderLocalPlayerInputs();
     this.checkLocalMatchSaved();
 
@@ -1065,7 +1108,7 @@ class GameController {
     if (!roomCodeFromUrl) {
       localStorage.removeItem("ta5mena_room_code");
       this.currentRoomCode = null;
-      this.reconnectBox.classList.add("hidden");
+      this.reconnectBox?.classList.add("hidden");
       this.switchView("home");
       return;
     }
@@ -1357,16 +1400,24 @@ class GameController {
   // ==========================================================================
 
   showConfirmModal({ title, message, confirmText = "CONFIRM", confirmClass = "btn-danger", onConfirm }) {
-    this.confirmModalTitle.textContent = title;
-    this.confirmModalMessage.textContent = message;
-    this.btnModalConfirmAction.textContent = confirmText;
-    this.btnModalConfirmAction.className = `btn btn-block ${confirmClass}`;
+    if (this.confirmModalTitle) this.confirmModalTitle.textContent = title;
+    if (this.confirmModalMessage) this.confirmModalMessage.textContent = message;
+    if (this.btnModalConfirmAction) {
+      this.btnModalConfirmAction.textContent = confirmText;
+      this.btnModalConfirmAction.className = `btn btn-block ${confirmClass}`;
+    }
     this.pendingConfirmCallback = onConfirm;
-    this.modalConfirm.classList.add("open");
+    if (this.modalConfirm) {
+      this.modalConfirm.classList.remove("hidden");
+      this.modalConfirm.classList.add("open");
+    }
   }
 
   closeConfirmModal() {
-    this.modalConfirm.classList.remove("open");
+    if (this.modalConfirm) {
+      this.modalConfirm.classList.remove("open");
+      this.modalConfirm.classList.add("hidden");
+    }
     this.pendingConfirmCallback = null;
   }
 
@@ -1408,9 +1459,14 @@ class GameController {
     this.btnHeaderMyList?.classList.add("hidden");
     this.btnHeaderLeave?.classList.add("hidden");
     this.modalMyList?.classList.remove("open");
-    if (this.modalHintsHub) this.modalHintsHub.classList.remove("open");
-    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
-    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
+    this.modalMyList?.classList.add("hidden");
+    if (this.modalHintsHub) { this.modalHintsHub.classList.remove("open"); this.modalHintsHub.classList.add("hidden"); }
+    if (this.modalConfirmation) { this.modalConfirmation.classList.remove("open"); this.modalConfirmation.classList.add("hidden"); }
+    if (this.waitingConfirmationBackdrop) { this.waitingConfirmationBackdrop.classList.remove("open"); this.waitingConfirmationBackdrop.classList.add("hidden"); }
+    if (this.modalPrivacyCurtain) { this.modalPrivacyCurtain.classList.remove("open"); this.modalPrivacyCurtain.classList.add("hidden"); }
+    if (this.modalLocalRevealConfirm) { this.modalLocalRevealConfirm.classList.remove("open"); this.modalLocalRevealConfirm.classList.add("hidden"); }
+    if (this.modalLocalVerifyChoice) { this.modalLocalVerifyChoice.classList.remove("open"); this.modalLocalVerifyChoice.classList.add("hidden"); }
+    if (this.modalLocalSecretTargetSlots) { this.modalLocalSecretTargetSlots.classList.remove("open"); this.modalLocalSecretTargetSlots.classList.add("hidden"); }
     this.hidePauseOverlay();
     this.closeGiveHintModal();
     this.closeHintsHubModal();
@@ -1557,6 +1613,7 @@ class GameController {
 
   showPauseOverlay(room, disconnected) {
     if (!this.modalPauseOverlay) return;
+    this.modalPauseOverlay.classList.remove("hidden");
     this.modalPauseOverlay.classList.add("open");
     this.pauseRoomCodeTag.textContent = `ROOM: ${room.meta.code}`;
     const names = disconnected.map(p => p.name).join(", ");
@@ -1586,6 +1643,7 @@ class GameController {
   hidePauseOverlay() {
     if (this.modalPauseOverlay) {
       this.modalPauseOverlay.classList.remove("open");
+      this.modalPauseOverlay.classList.add("hidden");
     }
   }
 
@@ -1671,6 +1729,7 @@ class GameController {
     }
     this.renderHintsHubSlots();
     if (this.modalHintsHub) {
+      this.modalHintsHub.classList.remove("hidden");
       this.modalHintsHub.classList.add("open");
     }
   }
@@ -1678,6 +1737,7 @@ class GameController {
   closeHintsHubModal() {
     if (this.modalHintsHub) {
       this.modalHintsHub.classList.remove("open");
+      this.modalHintsHub.classList.add("hidden");
     }
   }
 
@@ -1798,6 +1858,7 @@ class GameController {
     this.activeHintTargetSlot = null;
     if (this.modalGiveHint) {
       this.modalGiveHint.classList.remove("open");
+      this.modalGiveHint.classList.add("hidden");
     }
   }
 
@@ -2950,8 +3011,14 @@ class GameController {
     const confirmation = room.game ? room.game.confirmation : null;
 
     if (!confirmation || !confirmation.active) {
-      this.modalConfirmation.classList.remove("open");
-      this.waitingConfirmationBackdrop.classList.remove("open");
+      if (this.modalConfirmation) {
+        this.modalConfirmation.classList.remove("open");
+        this.modalConfirmation.classList.add("hidden");
+      }
+      if (this.waitingConfirmationBackdrop) {
+        this.waitingConfirmationBackdrop.classList.remove("open");
+        this.waitingConfirmationBackdrop.classList.add("hidden");
+      }
       return;
     }
 
@@ -2959,7 +3026,10 @@ class GameController {
 
     if (isTargetPlayer) {
       // Show confirmation popup to target player
-      this.waitingConfirmationBackdrop.classList.remove("open");
+      if (this.waitingConfirmationBackdrop) {
+        this.waitingConfirmationBackdrop.classList.remove("open");
+        this.waitingConfirmationBackdrop.classList.add("hidden");
+      }
       this.confirmGuesserName.textContent = confirmation.fromPlayerName;
       this.confirmGuessText.textContent = `"${confirmation.guessText}"`;
 
@@ -2983,21 +3053,33 @@ class GameController {
         }
       }
 
-      this.modalConfirmation.classList.add("open");
+      if (this.modalConfirmation) {
+        this.modalConfirmation.classList.remove("hidden");
+        this.modalConfirmation.classList.add("open");
+      }
     } else {
       // Spectator / Guesser waiting screen
-      this.modalConfirmation.classList.remove("open");
+      if (this.modalConfirmation) {
+        this.modalConfirmation.classList.remove("open");
+        this.modalConfirmation.classList.add("hidden");
+      }
       this.specTargetName.textContent = confirmation.toPlayerName;
       this.specGuessText.textContent = `"${confirmation.guessText}"`;
-      this.waitingConfirmationBackdrop.classList.add("open");
+      if (this.waitingConfirmationBackdrop) {
+        this.waitingConfirmationBackdrop.classList.remove("hidden");
+        this.waitingConfirmationBackdrop.classList.add("open");
+      }
     }
   }
 
   async handleConfirmResponse(confirmedRank) {
-    const confirmation = this.roomData.game ? this.roomData.game.confirmation : null;
+    const confirmation = this.roomData?.game ? this.roomData.game.confirmation : null;
     if (!confirmation || confirmation.toPlayerId !== this.myPlayerId) return;
 
-    this.modalConfirmation.classList.remove("open");
+    if (this.modalConfirmation) {
+      this.modalConfirmation.classList.remove("open");
+      this.modalConfirmation.classList.add("hidden");
+    }
 
     const guesserId = confirmation.fromPlayerId;
     const guesserPlayer = this.roomData.players[guesserId];
@@ -3405,17 +3487,20 @@ class GameController {
   // ==========================================================================
 
   toggleMyListDrawer(forceOpen) {
+    if (!this.modalMyList) return;
     const shouldOpen = (typeof forceOpen === "boolean") 
       ? forceOpen 
       : !this.modalMyList.classList.contains("open");
 
     if (shouldOpen) {
       this.renderMyListDrawer();
+      this.modalMyList.classList.remove("hidden");
       this.modalMyList.classList.add("open");
-      this.btnHeaderMyList.classList.add("active");
+      this.btnHeaderMyList?.classList.add("active");
     } else {
       this.modalMyList.classList.remove("open");
-      this.btnHeaderMyList.classList.remove("active");
+      this.modalMyList.classList.add("hidden");
+      this.btnHeaderMyList?.classList.remove("active");
     }
   }
 
@@ -3723,11 +3808,15 @@ class GameController {
       this.privacyCurtainActionName.textContent = actionTitle;
     }
     this.localCurtainProceedCallback = onProceed;
+    this.modalPrivacyCurtain.classList.remove("hidden");
     this.modalPrivacyCurtain.classList.add("open");
   }
 
   closePrivacyCurtain() {
-    this.modalPrivacyCurtain?.classList.remove("open");
+    if (this.modalPrivacyCurtain) {
+      this.modalPrivacyCurtain.classList.remove("open");
+      this.modalPrivacyCurtain.classList.add("hidden");
+    }
   }
 
   handlePrivacyCurtainProceed() {
@@ -4008,11 +4097,17 @@ class GameController {
       }
     }
 
-    this.modalLocalVerifyChoice?.classList.add("open");
+    if (this.modalLocalVerifyChoice) {
+      this.modalLocalVerifyChoice.classList.remove("hidden");
+      this.modalLocalVerifyChoice.classList.add("open");
+    }
   }
 
   closeLocalVerifyChoiceModal() {
-    this.modalLocalVerifyChoice?.classList.remove("open");
+    if (this.modalLocalVerifyChoice) {
+      this.modalLocalVerifyChoice.classList.remove("open");
+      this.modalLocalVerifyChoice.classList.add("hidden");
+    }
   }
 
   handleLocalOralRankCheck(rank) {
@@ -4101,13 +4196,19 @@ class GameController {
           }
         }
 
-        this.modalLocalSecretTargetSlots?.classList.add("open");
+        if (this.modalLocalSecretTargetSlots) {
+          this.modalLocalSecretTargetSlots.classList.remove("hidden");
+          this.modalLocalSecretTargetSlots.classList.add("open");
+        }
       }
     );
   }
 
   closeLocalSecretTargetSlotsModal() {
-    this.modalLocalSecretTargetSlots?.classList.remove("open");
+    if (this.modalLocalSecretTargetSlots) {
+      this.modalLocalSecretTargetSlots.classList.remove("open");
+      this.modalLocalSecretTargetSlots.classList.add("hidden");
+    }
   }
 
   showLocalRevealConfirm(title, message, onConfirm) {
@@ -4118,11 +4219,17 @@ class GameController {
       this.localRevealConfirmMessage.textContent = message;
     }
     this.localRevealConfirmCallback = onConfirm;
-    this.modalLocalRevealConfirm?.classList.add("open");
+    if (this.modalLocalRevealConfirm) {
+      this.modalLocalRevealConfirm.classList.remove("hidden");
+      this.modalLocalRevealConfirm.classList.add("open");
+    }
   }
 
   closeLocalRevealConfirm() {
-    this.modalLocalRevealConfirm?.classList.remove("open");
+    if (this.modalLocalRevealConfirm) {
+      this.modalLocalRevealConfirm.classList.remove("open");
+      this.modalLocalRevealConfirm.classList.add("hidden");
+    }
     this.localRevealConfirmCallback = null;
   }
 
@@ -4160,11 +4267,12 @@ class GameController {
     this.headerRoomTag?.classList.add("hidden");
 
     this.modalMyList?.classList.remove("open");
-    if (this.modalHintsHub) this.modalHintsHub.classList.remove("open");
-    if (this.modalPrivacyCurtain) this.modalPrivacyCurtain.classList.remove("open");
-    if (this.modalLocalRevealConfirm) this.modalLocalRevealConfirm.classList.remove("open");
-    if (this.modalLocalVerifyChoice) this.modalLocalVerifyChoice.classList.remove("open");
-    if (this.modalLocalSecretTargetSlots) this.modalLocalSecretTargetSlots.classList.remove("open");
+    this.modalMyList?.classList.add("hidden");
+    if (this.modalHintsHub) { this.modalHintsHub.classList.remove("open"); this.modalHintsHub.classList.add("hidden"); }
+    if (this.modalPrivacyCurtain) { this.modalPrivacyCurtain.classList.remove("open"); this.modalPrivacyCurtain.classList.add("hidden"); }
+    if (this.modalLocalRevealConfirm) { this.modalLocalRevealConfirm.classList.remove("open"); this.modalLocalRevealConfirm.classList.add("hidden"); }
+    if (this.modalLocalVerifyChoice) { this.modalLocalVerifyChoice.classList.remove("open"); this.modalLocalVerifyChoice.classList.add("hidden"); }
+    if (this.modalLocalSecretTargetSlots) { this.modalLocalSecretTargetSlots.classList.remove("open"); this.modalLocalSecretTargetSlots.classList.add("hidden"); }
 
     this.switchView("home");
     this.checkLocalMatchSaved();
@@ -4219,5 +4327,9 @@ class GameController {
 
 // Instantiate game on page load
 window.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".modal-backdrop").forEach(el => {
+    el.classList.remove("open");
+    el.classList.add("hidden");
+  });
   window.gameApp = new GameController();
 });

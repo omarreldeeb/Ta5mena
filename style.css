@@ -1023,7 +1023,7 @@ header.app-header {
   z-index: 1000;
 }
 
-.modal-backdrop.open {
+.modal-backdrop.open:not(.hidden) {
   display: flex;
 }
 
@@ -1887,13 +1887,18 @@ header.app-header {
   inset: 0;
   background-color: #080808;
   z-index: 99999;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 20px;
 }
 
+.modal-privacy-backdrop.open:not(.hidden) {
+  display: flex;
+}
+
 .privacy-curtain-card {
+  position: relative;
   max-width: 480px;
   width: 100%;
   background: #141414;
@@ -1907,6 +1912,27 @@ header.app-header {
   align-items: center;
   gap: 16px;
   animation: privacyCardAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.privacy-curtain-cancel-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.privacy-curtain-cancel-btn:hover {
+  background: rgba(255, 77, 0, 0.15);
+  border-color: var(--accent);
+  color: #FFFFFF;
 }
 
 .privacy-curtain-icon-wrap {
@@ -2075,3 +2101,12 @@ header.app-header {
   color: #FFFFFF;
   font-weight: 700;
 }
+
+/* ============================================================================
+   GLOBAL OVERRIDES: HIDDEN UTILITY
+   Must remain at the very bottom of the stylesheet so no flex/grid rule can override it
+   ============================================================================ */
+.hidden {
+  display: none !important;
+}
+
