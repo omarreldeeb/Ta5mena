@@ -1558,3 +1558,159 @@ header.app-header {
   padding: 10px 12px;
 }
 
+/* ============================================================================
+   FLOATING LIVE EVENT TOAST NOTIFICATION (10s AUTO-DISMISS)
+   ============================================================================ */
+
+.floating-toast-card {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  max-width: 520px;
+  width: 92%;
+  background: #181818;
+  border-radius: 4px;
+  border: 2px solid #FF4D00; /* Default general/skip/hint */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(255, 77, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  gap: 12px;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: floatingToastSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.floating-toast-card.toast-hiding {
+  opacity: 0;
+  transform: translate(-50%, -15px);
+  pointer-events: none;
+}
+
+.floating-toast-card.toast-success {
+  border-color: #00E676;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 230, 118, 0.35);
+}
+
+.floating-toast-card.toast-danger {
+  border-color: #FF3B30;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(255, 59, 48, 0.35);
+}
+
+.floating-toast-card.toast-milestone {
+  border-color: #FFD700;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 25px rgba(255, 215, 0, 0.45);
+}
+
+.floating-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.floating-toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-toast-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.floating-toast-close {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.floating-toast-close:hover {
+  background: #2a2a2a;
+  color: #FFFFFF;
+  border-color: var(--text-primary);
+}
+
+.floating-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: #FF4D00;
+  transform-origin: left;
+  animation: shrinkToastProgress 10s linear forwards;
+}
+
+.toast-success .floating-toast-progress {
+  background: #00E676;
+}
+
+.toast-danger .floating-toast-progress {
+  background: #FF3B30;
+}
+
+.toast-milestone .floating-toast-progress {
+  background: #FFD700;
+}
+
+@keyframes floatingToastSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -24px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes shrinkToastProgress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ============================================================================
+   FINISHED MILESTONE BADGES (1ST, 2ND, 3RD, ETC.)
+   ============================================================================ */
+
+.badge-finish {
+  background: #FFD700;
+  color: #111111;
+  font-weight: 800;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  vertical-align: middle;
+  border: 1px solid #FFE033;
+}
+
+

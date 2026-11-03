@@ -41,10 +41,19 @@
       </div>
     </header>
 
-    <!-- SYSTEM ALERTS / STATUS -->
-    <div id="system-alert-banner" class="reconnect-card hidden">
-      <div id="system-alert-text">System notice</div>
-      <button id="btn-close-alert" class="btn btn-sm">Dismiss</button>
+    <!-- FLOATING LIVE EVENT TOAST NOTIFICATION (10s AUTO-DISMISS) -->
+    <div id="floating-notification-toast" class="floating-toast-card hidden" role="alert" aria-live="polite">
+      <div class="floating-toast-content">
+        <div id="floating-toast-icon" class="floating-toast-icon"></div>
+        <div id="floating-toast-text" class="floating-toast-text">System notice</div>
+      </div>
+      <button id="btn-floating-toast-close" type="button" class="floating-toast-close" title="Dismiss" aria-label="Dismiss">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div id="floating-toast-progress" class="floating-toast-progress"></div>
     </div>
 
     <!-- ===================================================================== -->
@@ -261,8 +270,8 @@
     <!-- VIEW 4: MAIN GAME PHASE -->
     <!-- ===================================================================== -->
     <section id="view-game" class="view-section">
-      <!-- Live Action Feed Ticker -->
-      <div class="action-feed">
+      <!-- Live Action Feed Ticker (Hidden, replaced by Floating Live Toast) -->
+      <div class="action-feed hidden" style="display: none !important;">
         <span id="action-feed-text" class="action-feed-text">Match started. Round 1 in progress.</span>
         <span id="action-feed-time" class="action-feed-time">LIVE</span>
       </div>
@@ -272,7 +281,6 @@
         <div class="flex-between" style="margin-bottom: 6px;">
           <span class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">TURN ORDER</span>
           <div style="display: flex; align-items: center; gap: 6px;">
-            <button id="btn-host-skip-turn-bar" type="button" class="btn btn-sm btn-danger-outline hidden" style="height: 24px; padding: 0 8px; font-size: 11px; font-family: var(--font-mono);">SKIP TURN</button>
             <span id="game-round-indicator" class="badge">ROUND 1</span>
           </div>
         </div>
@@ -329,9 +337,6 @@
           <div id="player-tabs-bar" class="player-tabs-bar">
             <!-- Opponent tabs dynamically created -->
           </div>
-          <button id="btn-toggle-my-list" class="my-list-toggle-btn">
-            My Secret List
-          </button>
         </div>
 
         <!-- Target Player Info Banner -->

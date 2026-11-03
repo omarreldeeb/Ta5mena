@@ -295,6 +295,11 @@ class GameController {
     this.pendingConfirmCallback = null;
     this.customCategoryAutoSaveTimeout = null;
 
+    // Floating Live Event Toast
+    this.toastDismissTimeout = null;
+    this.toastFadeTimeout = null;
+    this.lastSeenActionTimestamp = Date.now() - 3000;
+
     this.cacheDomElements();
     this.bindEvents();
     this.initAppRouting();
@@ -312,15 +317,17 @@ class GameController {
       game_over: document.getElementById("view-game-over")
     };
 
-    // Header & Alert
+    // Header & Floating Live Event Toast
     this.headerRoomTag = document.getElementById("header-room-tag");
     this.headerRoomCode = document.getElementById("header-room-code");
     this.btnHeaderHints = document.getElementById("btn-header-hints");
     this.btnHeaderMyList = document.getElementById("btn-header-my-list");
     this.btnHeaderLeave = document.getElementById("btn-header-leave");
-    this.systemAlertBanner = document.getElementById("system-alert-banner");
-    this.systemAlertText = document.getElementById("system-alert-text");
-    this.btnCloseAlert = document.getElementById("btn-close-alert");
+    this.systemAlertBanner = document.getElementById("floating-notification-toast") || document.getElementById("system-alert-banner");
+    this.systemAlertText = document.getElementById("floating-toast-text") || document.getElementById("system-alert-text");
+    this.floatingToastIcon = document.getElementById("floating-toast-icon");
+    this.floatingToastProgress = document.getElementById("floating-toast-progress");
+    this.btnCloseAlert = document.getElementById("btn-floating-toast-close") || document.getElementById("btn-close-alert");
 
     // Hints Hub Modal
     this.modalHintsHub = document.getElementById("modal-hints-hub");
@@ -448,8 +455,10 @@ class GameController {
   }
 
   bindEvents() {
-    // Navigation / Alerts
-    this.btnCloseAlert.addEventListener("click", () => this.hideAlert());
+    // Navigation / Alerts & Floating Live Event Toast
+    const onDismissToast = () => this.hideAlert();
+    this.btnCloseAlert?.addEventListener("click", onDismissToast);
+    this.btnCloseAlert?.addEventListener("pointerdown", onDismissToast);
 
     // Reusable Confirmation Modal
     this.btnModalCancel.addEventListener("click", () => this.closeConfirmModal());
@@ -596,11 +605,9 @@ class GameController {
     };
     this.btnHostSkipTurn?.addEventListener("click", onHostSkip);
     this.btnHostSkipTurn?.addEventListener("pointerdown", onHostSkip);
-    this.btnHostSkipTurnBar?.addEventListener("click", onHostSkip);
-    this.btnHostSkipTurnBar?.addEventListener("pointerdown", onHostSkip);
 
     document.addEventListener("click", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-host-skip-turn-bar");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -608,7 +615,7 @@ class GameController {
       }
     });
     document.addEventListener("pointerdown", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-host-skip-turn-bar");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -623,7 +630,7 @@ class GameController {
       }
     });
     this.btnSubmitGuess.addEventListener("click", () => this.handleSubmitTurnGuess());
-    this.btnToggleMyList.addEventListener("click", () => this.toggleMySecretList());
+    this.btnToggleMyList?.addEventListener("click", () => this.toggleMySecretList());
 
     // Confirmation Layer 3
     this.btnConfirmWrong.addEventListener("click", () => this.handleConfirmResponse(null));
@@ -658,18 +665,183 @@ class GameController {
       this.headerRoomCode.textContent = this.currentRoomCode;
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.remove("hidden");
       if (this.btnHeaderHints) {
-        this.btnHeaderHints.classList.toggle("hidden", viewName !== "game");
+        if (viewName !== "game") {
+          this.btnHeaderHints.classList.add("hidden");
+        } else if (this.roomData) {
+          this.updateMyListButtonVisibility(this.roomData);
+        }
       }
     }
   }
 
-  showAlert(message) {
-    this.systemAlertText.textContent = message;
-    this.systemAlertBanner.classList.remove("hidden");
+  // ==========================================================================
+  // FLOATING LIVE EVENT TOAST NOTIFICATION (10s AUTO-DISMISS)
+  // ==========================================================================
+
+  getToastIconSvg(type) {
+    if (type === "success") {
+      return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#00E676" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    } else if (type === "danger") {
+      return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FF3B30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+    } else if (type === "milestone") {
+      return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34"/><path d="M6 4h12v7a6 6 0 0 1-12 0V4z"/></svg>`;
+    } else if (type === "hint") {
+      return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"/></svg>`;
+    } else {
+      return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FF4D00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+    }
+  }
+
+  showFloatingNotification(message, type = "general") {
+    if (!message) return;
+    if (this.toastDismissTimeout) clearTimeout(this.toastDismissTimeout);
+    if (this.toastFadeTimeout) clearTimeout(this.toastFadeTimeout);
+
+    const toast = this.systemAlertBanner;
+    if (!toast) return;
+
+    // Detect type if not explicit
+    let resolvedType = type;
+    const lower = message.toLowerCase();
+    if (resolvedType === "general" || !resolvedType) {
+      if (lower.includes("100% complete") || lower.includes("place)")) {
+        resolvedType = "milestone";
+      } else if (lower.includes("guessed '") || (lower.includes("guessed") && lower.includes("pts"))) {
+        resolvedType = "success";
+      } else if (lower.includes("missed") || lower.includes("not on my list")) {
+        resolvedType = "danger";
+      } else if (lower.includes("hint") || lower.includes("clue")) {
+        resolvedType = "hint";
+      } else if (lower.includes("skipped")) {
+        resolvedType = "skip";
+      }
+    }
+
+    // Reset and apply style class
+    toast.className = "floating-toast-card";
+    if (resolvedType === "success") {
+      toast.classList.add("toast-success");
+    } else if (resolvedType === "danger") {
+      toast.classList.add("toast-danger");
+    } else if (resolvedType === "milestone") {
+      toast.classList.add("toast-milestone");
+    } else {
+      toast.classList.add("toast-general");
+    }
+
+    if (this.floatingToastIcon) {
+      this.floatingToastIcon.innerHTML = this.getToastIconSvg(resolvedType);
+    }
+    if (this.systemAlertText) {
+      this.systemAlertText.textContent = message;
+    }
+
+    // Restart the 10-second CSS shrinking progress bar animation
+    const oldProgress = document.getElementById("floating-toast-progress");
+    if (oldProgress) oldProgress.remove();
+    const newProgress = document.createElement("div");
+    newProgress.id = "floating-toast-progress";
+    newProgress.className = "floating-toast-progress";
+    toast.appendChild(newProgress);
+    this.floatingToastProgress = newProgress;
+
+    // Show toast
+    toast.classList.remove("hidden");
+    toast.classList.remove("toast-hiding");
+
+    // 10-second auto-dismiss
+    this.toastDismissTimeout = setTimeout(() => {
+      this.dismissFloatingNotification();
+    }, 10000);
+  }
+
+  dismissFloatingNotification() {
+    if (this.toastDismissTimeout) clearTimeout(this.toastDismissTimeout);
+    const toast = this.systemAlertBanner;
+    if (!toast || toast.classList.contains("hidden")) return;
+
+    toast.classList.add("toast-hiding");
+    this.toastFadeTimeout = setTimeout(() => {
+      toast.classList.add("hidden");
+      toast.classList.remove("toast-hiding");
+    }, 300);
+  }
+
+  showAlert(message, type = "general") {
+    this.showFloatingNotification(message, type);
   }
 
   hideAlert() {
-    this.systemAlertBanner.classList.add("hidden");
+    this.dismissFloatingNotification();
+  }
+
+  // ==========================================================================
+  // PLACEMENT MILESTONE HELPERS
+  // ==========================================================================
+
+  getOrdinalPlace(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return `${n}${s[(v - 20) % 10] || s[v] || s[0]} Place`;
+  }
+
+  getOrdinalBadge(n) {
+    const s = ["TH", "ST", "ND", "RD"];
+    const v = n % 100;
+    return `FINISHED - ${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  }
+
+  checkAndRecordListCompletion(targetPlayerId, newlyRevealedRank, updates, baseActionText = "") {
+    const targetList = this.roomData?.lists?.[targetPlayerId] || {};
+    let remaining = 0;
+    for (let r = 1; r <= 10; r++) {
+      if (r !== newlyRevealedRank && targetList[r] && !targetList[r].revealed) {
+        remaining++;
+      }
+    }
+
+    if (remaining === 0) {
+      updates[`players/${targetPlayerId}/targetCompleted`] = true;
+
+      const currentFinished = this.roomData?.finishedOrder 
+        ? (Array.isArray(this.roomData.finishedOrder) ? [...this.roomData.finishedOrder] : Object.values(this.roomData.finishedOrder))
+        : [];
+
+      if (!currentFinished.includes(targetPlayerId)) {
+        currentFinished.push(targetPlayerId);
+        updates["finishedOrder"] = currentFinished;
+
+        const placeNum = currentFinished.length;
+        const placeText = this.getOrdinalPlace(placeNum);
+        const targetPlayer = this.roomData?.players?.[targetPlayerId];
+        const targetName = targetPlayer?.name || "Player";
+        const milestoneText = `${targetName}'s list is 100% complete (${placeText})! The game continues until everyone finishes!`;
+
+        updates["game/lastAction"] = {
+          text: milestoneText,
+          type: "milestone",
+          timestamp: Date.now()
+        };
+        return milestoneText;
+      }
+    }
+
+    if (baseActionText) {
+      updates["game/lastAction"] = {
+        text: baseActionText,
+        type: "success",
+        timestamp: Date.now()
+      };
+    }
+    return baseActionText;
+  }
+
+  hasNoValidTargets(playerId, room) {
+    const lists = room?.lists || {};
+    const playerIds = Object.keys(room?.players || {});
+    const opponentIds = playerIds.filter(id => id !== playerId);
+    if (opponentIds.length === 0) return true;
+    return opponentIds.every(id => this.isPlayerListCompleted(id, lists));
   }
 
   // ==========================================================================
@@ -940,6 +1112,7 @@ class GameController {
         }
       },
       lists: {},
+      finishedOrder: [],
       game: {
         turnOrder: [],
         currentTurnIndex: 0,
@@ -1198,6 +1371,17 @@ class GameController {
       // Check pause state: if any player has connected === false during match, show pause overlay
       this.checkGamePauseState(room);
 
+      // Live floating notification for game events
+      if (room.game?.lastAction?.text && room.game.lastAction.timestamp) {
+        const actionTs = room.game.lastAction.timestamp;
+        if (actionTs > this.lastSeenActionTimestamp) {
+          this.lastSeenActionTimestamp = actionTs;
+          if (Date.now() - actionTs < 15000) {
+            this.showFloatingNotification(room.game.lastAction.text, room.game.lastAction.type || "general");
+          }
+        }
+      }
+
       // Check if any opponent dropped hints
       this.checkForNewHints(room);
 
@@ -1322,7 +1506,7 @@ class GameController {
             this.seenHints.add(hintKey);
             // Prominent live toast: "[Player Name] dropped a hint for their #N pick: [Hint Text]"
             if (pid !== this.myPlayerId && (!hint.timestamp || hint.timestamp > (this.connectedTimestamp - 5000))) {
-              this.showAlert(`${p.name} dropped a hint for their #${slotRank} pick: ${hint.text}`);
+              this.showAlert(`${p.name} dropped a hint for their #${slotRank} pick: ${hint.text}`, "hint");
             }
           }
         });
@@ -1333,6 +1517,13 @@ class GameController {
   openHintsHubModal() {
     if (!this.roomData || !this.roomData.lists || !this.myPlayerId) {
       this.showAlert("Waiting for game list data...");
+      return;
+    }
+    const isPlaying = (this.roomData.meta?.status === "playing");
+    const activePlayerId = this.roomData.game?.activePlayerId || (this.roomData.game?.turnOrder ? this.roomData.game.turnOrder[this.roomData.game.currentTurnIndex || 0] : null);
+    const isMyTurn = (isPlaying && activePlayerId === this.myPlayerId);
+    if (!isMyTurn) {
+      this.showAlert("You can only drop hints during your turn!");
       return;
     }
     this.renderHintsHubSlots();
@@ -1498,13 +1689,14 @@ class GameController {
     updates[`players/${this.myPlayerId}/hints/${rank}`] = hintData;
     updates[`game/lastAction`] = {
       text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
+      type: "hint",
       timestamp: Date.now()
     };
     updates["lastActivity"] = Date.now();
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
     this.closeGiveHintModal();
-    this.showAlert(`Hint broadcast for #${rank} pick: "${hintText}"`);
+    this.showAlert(`Hint broadcast for #${rank} pick: "${hintText}"`, "hint");
 
     if (this.modalMyList?.classList.contains("open")) {
       this.renderMyListDrawer();
@@ -1526,14 +1718,19 @@ class GameController {
     const show = !!(isEntryLocked || isPlaying);
     this.btnHeaderMyList?.classList.toggle("hidden", !show);
     
-    // Lightbulb HINTS button is ALWAYS visible to every player during all rounds of the active game (whether their turn or not)
-    this.btnHeaderHints?.classList.toggle("hidden", !isPlaying);
+    // Lightbulb HINTS button is ONLY visible to the player whose active turn it currently is
+    const activePlayerId = room.game?.activePlayerId || (room.game?.turnOrder ? room.game.turnOrder[room.game.currentTurnIndex || 0] : null);
+    const isMyTurn = (isPlaying && activePlayerId === this.myPlayerId);
+    this.btnHeaderHints?.classList.toggle("hidden", !isMyTurn);
+    if (!isMyTurn && this.modalHintsHub?.classList.contains("open")) {
+      this.closeHintsHubModal();
+    }
 
     // If modal is currently open, live update its slots
     if (this.modalMyList?.classList.contains("open")) {
       this.renderMyListDrawer();
     }
-    if (this.modalHintsHub?.classList.contains("open")) {
+    if (isMyTurn && this.modalHintsHub?.classList.contains("open")) {
       this.renderHintsHubSlots();
     }
   }
@@ -2155,11 +2352,6 @@ class GameController {
     this.handleConfirmationState(room);
 
     // Active vs Passive Turn Control
-    if (this.isHost) {
-      this.btnHostSkipTurnBar.classList.remove("hidden");
-    } else {
-      this.btnHostSkipTurnBar.classList.add("hidden");
-    }
 
     if (isMyTurn) {
       this.activeTurnControl.classList.remove("hidden");
@@ -2208,8 +2400,11 @@ class GameController {
       nextRound += 1;
     }
 
-    if (this.isSoleRemainingPlayer(turnOrder[nextIndex], this.roomData)) {
+    let attempts = 0;
+    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
       nextIndex = (nextIndex + 1) % turnOrder.length;
+      if (nextIndex === 0) nextRound += 1;
+      attempts++;
     }
 
     const nextActivePlayerId = turnOrder[nextIndex];
@@ -2225,13 +2420,14 @@ class GameController {
       "game/pendingGuess": null,
       "game/lastAction": {
         text: `Host skipped ${activeName}'s turn.`,
+        type: "skip",
         timestamp: Date.now()
       },
       "lastActivity": Date.now()
     };
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
-    this.showAlert(`Host skipped ${activeName}'s turn.`);
+    this.showAlert(`Host skipped ${activeName}'s turn.`, "skip");
   }
 
   handleHostSkipTurn() {
@@ -2390,6 +2586,11 @@ class GameController {
 
     if (!targetList || !targetPlayer || !myPlayer) return;
 
+    if (this.isPlayerListCompleted(targetPlayerId, this.roomData.lists)) {
+      this.showAlert("This player's list is already 100% complete! Choose another target.");
+      return;
+    }
+
     const normGuess = normalizeText(guessText);
 
     // Prevent duplicate wrong guesses on this target player
@@ -2492,23 +2693,9 @@ class GameController {
     updates[`lists/${targetPlayerId}/${slot.rank}/revealed`] = true;
     updates[`lists/${targetPlayerId}/${slot.rank}/guessedBy`] = guesserPlayer.name;
     updates[`players/${this.myPlayerId}/points`] = newGuesserPoints;
-    updates[`game/lastAction`] = {
-      text: actionText,
-      timestamp: Date.now()
-    };
     updates["lastActivity"] = Date.now();
 
-    // Check if target's list is completely revealed
-    const targetList = this.roomData.lists[targetPlayerId];
-    let remaining = 0;
-    for (let r = 1; r <= 10; r++) {
-      if (r !== slot.rank && targetList[r] && !targetList[r].revealed) {
-        remaining++;
-      }
-    }
-    if (remaining === 0) {
-      updates[`players/${targetPlayerId}/targetCompleted`] = true;
-    }
+    this.checkAndRecordListCompletion(targetPlayerId, slot.rank, updates, actionText);
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
     await this.advanceTurn();
@@ -2524,11 +2711,15 @@ class GameController {
       nextRound += 1;
     }
 
-    // Edge case: if a player has unrevealed items left but all other players have 100% completed lists,
-    // that sole player cannot target anyone, so their turn is skipped.
-    const activeCandidateId = turnOrder[nextIndex];
-    if (this.isSoleRemainingPlayer(activeCandidateId, this.roomData)) {
+    // If candidate has no valid opponents with unrevealed picks left to guess on,
+    // advance to next player who CAN target someone.
+    let attempts = 0;
+    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
       nextIndex = (nextIndex + 1) % turnOrder.length;
+      if (nextIndex === 0) {
+        nextRound += 1;
+      }
+      attempts++;
     }
 
     const nextActivePlayerId = turnOrder[nextIndex];
@@ -2621,22 +2812,9 @@ class GameController {
       updates[`lists/${this.myPlayerId}/${confirmedRank}/revealed`] = true;
       updates[`lists/${this.myPlayerId}/${confirmedRank}/guessedBy`] = confirmation.fromPlayerName;
       updates[`players/${guesserId}/points`] = newPoints;
-      updates[`game/lastAction`] = {
-        text: actionText,
-        timestamp: Date.now()
-      };
       updates["lastActivity"] = Date.now();
 
-      // Check if my list is now complete
-      let remaining = 0;
-      for (let r = 1; r <= 10; r++) {
-        if (r !== confirmedRank && !this.roomData.lists[this.myPlayerId][r].revealed) {
-          remaining++;
-        }
-      }
-      if (remaining === 0) {
-        updates[`players/${this.myPlayerId}/targetCompleted`] = true;
-      }
+      this.checkAndRecordListCompletion(this.myPlayerId, confirmedRank, updates, actionText);
 
       await db.update(`rooms/${this.currentRoomCode}`, updates);
     } else {
@@ -2658,6 +2836,7 @@ class GameController {
       const updates = {
         "game/lastAction": {
           text: actionText,
+          type: "danger",
           timestamp: Date.now()
         },
         "lastActivity": Date.now()
@@ -2683,20 +2862,34 @@ class GameController {
       this.viewingPlayerId = opponentIds[0];
     }
 
+    const finishedOrder = room.finishedOrder 
+      ? (Array.isArray(room.finishedOrder) ? room.finishedOrder : Object.values(room.finishedOrder))
+      : [];
+
     this.playerTabsBar.innerHTML = "";
     opponentIds.forEach(id => {
       const p = players[id];
       if (!p) return;
       const isSelected = (!this.isViewingMySecretList && this.viewingPlayerId === id);
-      const isCompleted = this.isPlayerListCompleted(id, room.lists || {});
+      const finishIndex = finishedOrder.indexOf(id);
+      const isCompleted = (finishIndex !== -1) || this.isPlayerListCompleted(id, room.lists || {});
 
       const tab = document.createElement("button");
-      tab.className = `player-tab-btn ${isSelected ? 'active' : ''}`;
-      tab.textContent = p.name + (isCompleted ? ' (Done)' : '');
+      tab.className = `player-tab-btn ${isSelected ? 'active' : ''} ${isCompleted ? 'is-completed' : ''}`;
+      
+      if (finishIndex !== -1) {
+        const badgeText = this.getOrdinalBadge(finishIndex + 1);
+        tab.innerHTML = `<span>${this.escapeHtml(p.name)}</span> <span class="badge badge-finish">${badgeText}</span>`;
+      } else if (isCompleted) {
+        tab.innerHTML = `<span>${this.escapeHtml(p.name)}</span> <span class="badge badge-finish">FINISHED</span>`;
+      } else {
+        tab.textContent = p.name;
+      }
+
       tab.addEventListener("click", () => {
         this.viewingPlayerId = id;
         this.isViewingMySecretList = false;
-        this.btnToggleMyList.classList.remove("active");
+        this.btnToggleMyList?.classList.remove("active");
         this.renderPlayerTabs(room);
         this.renderBoardSlots(room);
       });
@@ -2707,11 +2900,11 @@ class GameController {
   toggleMySecretList() {
     this.isViewingMySecretList = !this.isViewingMySecretList;
     if (this.isViewingMySecretList) {
-      this.btnToggleMyList.classList.add("active");
+      this.btnToggleMyList?.classList.add("active");
       this.viewingPlayerId = this.myPlayerId;
     } else {
-      this.btnToggleMyList.classList.remove("active");
-      const opponentIds = Object.keys(this.roomData.players || {}).filter(id => id !== this.myPlayerId);
+      this.btnToggleMyList?.classList.remove("active");
+      const opponentIds = Object.keys(this.roomData?.players || {}).filter(id => id !== this.myPlayerId);
       this.viewingPlayerId = opponentIds[0] || this.myPlayerId;
     }
     this.renderPlayerTabs(this.roomData);
@@ -2765,8 +2958,18 @@ class GameController {
       if (list[r] && !list[r].revealed) hiddenCount++;
     }
 
-    this.selectedBoardStatusBadge.textContent = `${hiddenCount} / 10 HIDDEN`;
-    this.selectedBoardStatusBadge.className = `badge ${hiddenCount === 0 ? 'badge-success' : ''}`;
+    const finishedOrder = room.finishedOrder 
+      ? (Array.isArray(room.finishedOrder) ? room.finishedOrder : Object.values(room.finishedOrder))
+      : [];
+    const finishIndex = finishedOrder.indexOf(targetId);
+
+    if (finishIndex !== -1) {
+      this.selectedBoardStatusBadge.textContent = this.getOrdinalBadge(finishIndex + 1);
+      this.selectedBoardStatusBadge.className = "badge badge-finish";
+    } else {
+      this.selectedBoardStatusBadge.textContent = `${hiddenCount} / 10 HIDDEN`;
+      this.selectedBoardStatusBadge.className = `badge ${hiddenCount === 0 ? 'badge-success' : ''}`;
+    }
 
     // Render 10 slots
     this.boardSlotsList.innerHTML = "";
@@ -2881,15 +3084,13 @@ class GameController {
     const players = Object.values(room.players || {});
     const lists = room.lists || {};
 
-    // Condition: every player's list is 100% revealed OR only 1 player has unrevealed items left
-    let uncompletedCount = 0;
-    players.forEach(p => {
-      if (!this.isPlayerListCompleted(p.id, lists)) {
-        uncompletedCount++;
-      }
-    });
+    if (players.length < 2) return;
 
-    if (uncompletedCount <= 1 && players.length >= 2) {
+    // The game continues until everyone finishes:
+    // Condition: every player's list is 100% revealed
+    const allCompleted = players.every(p => this.isPlayerListCompleted(p.id, lists));
+
+    if (allCompleted) {
       if (this.isHost) {
         db.update(`rooms/${this.currentRoomCode}/meta`, { status: "game_over" });
       }
@@ -2968,6 +3169,7 @@ class GameController {
         text: "New match starting. Host is choosing category.",
         timestamp: Date.now()
       },
+      "finishedOrder": [],
       "lists": {}
     };
 
