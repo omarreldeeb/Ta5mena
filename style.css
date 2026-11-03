@@ -105,7 +105,12 @@ h1, h2, h3, h4 {
    BASE UI ELEMENTS (SHARP 4PX CORNERS, ZERO PILLS)
    ============================================================================ */
 
-button, .btn {
+#btn-header-leave,
+#btn-leave-room,
+#btn-pause-leave-room,
+#btn-return-home,
+button,
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -123,16 +128,22 @@ button, .btn {
   background-color: var(--bg-card);
   color: var(--text-primary);
   transition: background-color 0.12s ease, border-color 0.12s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+#btn-header-leave::selection,
+#btn-header-leave *::selection,
+.btn::selection {
+  background: transparent !important;
 }
 
 button:focus, .btn:focus {
-  outline: none;
+  outline: none !important;
 }
 
 button:hover:not(:disabled), .btn:hover:not(:disabled) {
@@ -1340,6 +1351,23 @@ header.app-header {
   border: 1px solid var(--accent);
   padding: 2px 6px;
   border-radius: 2px;
+}
+
+.board-slot-hint-bright {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #FFFFFF;
+  background-color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 /* ============================================================================

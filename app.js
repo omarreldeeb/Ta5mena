@@ -107,6 +107,28 @@ class DatabaseService {
     }
   }
 
+  async registerSoloLobbyDisconnect(roomCode) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      try {
+        const { ref, onDisconnect } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+        const roomRef = ref(this.fbDb, `rooms/${roomCode}`);
+        await onDisconnect(roomRef).remove();
+      } catch (err) {}
+    }
+  }
+
+  async cancelSoloLobbyDisconnect(roomCode) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      try {
+        const { ref, onDisconnect } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+        const roomRef = ref(this.fbDb, `rooms/${roomCode}`);
+        await onDisconnect(roomRef).cancel();
+      } catch (err) {}
+    }
+  }
+
   async stopPlayerConnectionTracking(roomCode, playerId) {
     if (this.disconnectUnsub) {
       this.disconnectUnsub();
@@ -117,6 +139,8 @@ class DatabaseService {
         const { ref, onDisconnect } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
         const playerConnectedRef = ref(this.fbDb, `rooms/${roomCode}/players/${playerId}/connected`);
         await onDisconnect(playerConnectedRef).cancel();
+        const roomRef = ref(this.fbDb, `rooms/${roomCode}`);
+        await onDisconnect(roomRef).cancel();
       } catch (err) {}
     }
   }
@@ -434,22 +458,42 @@ class GameController {
       }
     });
 
-    // Document-level event delegation for Leave buttons:
-    // Ensures clicks are NEVER lost, detached, or swallowed by DOM re-renders or focus states
-    document.addEventListener("click", (e) => {
+    // Immediate Leave handlers (pointerdown and mousedown to beat re-renders and mouse selection)
+    const handleImmediateLeave = (e) => {
       const leaveTrigger = e.target.closest("#btn-header-leave, #btn-leave-room, #btn-pause-leave-room, #btn-return-home");
       if (leaveTrigger) {
         e.preventDefault();
         e.stopPropagation();
-        this.requestLeaveRoom();
+        this.executeLeaveRoom();
       }
-    });
+    };
+    document.addEventListener("pointerdown", handleImmediateLeave, { capture: true });
+    document.addEventListener("mousedown", handleImmediateLeave, { capture: true });
+    document.addEventListener("click", handleImmediateLeave, { capture: true });
+
+    if (this.btnHeaderLeave) {
+      this.btnHeaderLeave.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.executeLeaveRoom();
+      });
+      this.btnHeaderLeave.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.executeLeaveRoom();
+      });
+      this.btnHeaderLeave.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.executeLeaveRoom();
+      });
+    }
 
     // Window navigation sync
     window.addEventListener("hashchange", () => {
       const codeInUrl = this.getRoomCodeFromUrl();
       if (!codeInUrl && this.currentRoomCode) {
-        this.leaveRoom();
+        this.executeLeaveRoom();
       }
     });
 
@@ -463,10 +507,19 @@ class GameController {
       }
     });
 
-    // Window disconnect handler (sets connected to false without destroying room)
+    // Window disconnect handler (sets connected to false, deletes solo lobby if host refreshes)
     window.addEventListener("beforeunload", () => {
-      if (this.currentRoomCode && this.myPlayerId) {
-        db.setPlayerConnected(this.currentRoomCode, this.myPlayerId, false);
+      if (this.currentRoomCode) {
+        const isLobby = !this.roomData || !this.roomData.meta || this.roomData.meta.status === "lobby" || this.roomData.meta.status === "waiting";
+        const players = this.roomData ? Object.values(this.roomData.players || {}) : [];
+        if (isLobby && (this.isHost || players.length <= 1)) {
+          try {
+            navigator.sendBeacon(`https://ta5mena-default-rtdb.firebaseio.com/rooms/${this.currentRoomCode}.json?x-http-method-override=DELETE`);
+          } catch (e) {}
+        }
+        if (this.myPlayerId) {
+          db.setPlayerConnected(this.currentRoomCode, this.myPlayerId, false);
+        }
       }
     });
 
@@ -518,9 +571,34 @@ class GameController {
     this.btnRestoreLastList.addEventListener("click", () => this.restoreLastList());
     this.btnSubmitList.addEventListener("click", () => this.handleSubmitSecretList());
 
-    // Game Phase
-    this.btnHostSkipTurn.addEventListener("click", () => this.handleHostSkipTurn());
-    this.btnHostSkipTurnBar.addEventListener("click", () => this.handleHostSkipTurn());
+    // Game Phase Skip Turn (Immediate execution, bypass broken modals)
+    const onHostSkip = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.hostSkipTurn();
+    };
+    this.btnHostSkipTurn?.addEventListener("click", onHostSkip);
+    this.btnHostSkipTurn?.addEventListener("pointerdown", onHostSkip);
+    this.btnHostSkipTurnBar?.addEventListener("click", onHostSkip);
+    this.btnHostSkipTurnBar?.addEventListener("pointerdown", onHostSkip);
+
+    document.addEventListener("click", (e) => {
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-host-skip-turn-bar");
+      if (skipTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hostSkipTurn();
+      }
+    });
+    document.addEventListener("pointerdown", (e) => {
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-host-skip-turn-bar");
+      if (skipTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hostSkipTurn();
+      }
+    });
+
     this.inputTurnGuess.addEventListener("input", (e) => this.handleTurnGuessInput(e.target.value));
     this.inputTurnGuess.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !this.btnSubmitGuess.disabled) {
@@ -679,13 +757,46 @@ class GameController {
         } catch (e) {}
       }
       this.discardSession();
-      this.updateRoomUrl(null);
+      try {
+        window.location.hash = "";
+        this.updateRoomUrl(null);
+      } catch (e) {}
       this.switchView("home");
       this.showAlert("Room expired or no longer exists.");
       return;
     }
 
-    // Room is active: check if saved playerId belongs to this room
+    const status = room?.meta?.status;
+    const isLobbyOrWaiting = (status === "lobby" || status === "waiting");
+    const isSolo = players.length <= 1;
+
+    // RULE 1: If room is in lobby/waiting state with <= 1 player, delete rooms/{roomCode}, clear localStorage, strip URL, and go to clean Home Screen without any message
+    if (isLobbyOrWaiting && isSolo) {
+      try {
+        await db.remove(`rooms/${roomCodeFromUrl}`);
+      } catch (e) {}
+      this.discardSession();
+      try {
+        window.location.hash = "";
+        this.updateRoomUrl(null);
+      } catch (e) {}
+      this.switchView("home");
+      return;
+    }
+
+    // RULE 2: NEVER auto-reconnect on page load/refresh if room status is "lobby" / "waiting" (before game has started) OR if room has only 1 player
+    if (isLobbyOrWaiting || isSolo) {
+      this.discardSession();
+      try {
+        window.location.hash = "";
+        this.updateRoomUrl(null);
+      } catch (e) {}
+      this.inputRoomCode.value = roomCodeFromUrl;
+      this.switchView("home");
+      return;
+    }
+
+    // Room is active (game started: "entry", "playing", "game_over"): check if saved playerId belongs to this room
     const savedPlayerId = localStorage.getItem("ta5mena_player_id");
     if (savedPlayerId && room.players && room.players[savedPlayerId]) {
       // Reconnect existing seat
@@ -822,6 +933,7 @@ class GameController {
     };
 
     await db.set(`rooms/${roomCode}`, initialRoom);
+    await db.registerSoloLobbyDisconnect(roomCode);
     await db.trackPlayerConnection(roomCode, playerId);
     this.saveSession(playerId, name, roomCode);
     this.updateRoomUrl(roomCode);
@@ -922,13 +1034,7 @@ class GameController {
   }
 
   requestLeaveRoom() {
-    this.showConfirmModal({
-      title: "LEAVE ROOM",
-      message: "Leave this room?",
-      confirmText: "LEAVE ROOM",
-      confirmClass: "btn-danger",
-      onConfirm: () => this.executeLeaveRoom()
-    });
+    this.executeLeaveRoom();
   }
 
   async executeLeaveRoom() {
@@ -948,14 +1054,38 @@ class GameController {
       try { await db.stopPlayerConnectionTracking(roomCode, playerId); } catch (e) {}
     }
 
-    // 2. Remove player from Firebase (and delete room completely if 0 players remain)
+    // 2. Wipe room session from localStorage & reset state right away
+    this.discardSession();
+    this.currentRoomCode = null;
+    this.roomData = null;
+    this.isHost = false;
+
+    // 3. Reset URL back to base homepage
+    try {
+      window.location.hash = "";
+      this.updateRoomUrl(null);
+    } catch (e) {}
+
+    // 4. Clean up UI elements & switch to Home Screen instantly
+    this.btnHeaderMyList?.classList.add("hidden");
+    this.btnHeaderLeave?.classList.add("hidden");
+    this.modalMyList?.classList.remove("open");
+    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
+    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
+    this.hidePauseOverlay();
+    this.closeGiveHintModal();
+    this.closeConfirmModal();
+    this.switchView("home");
+
+    // 5. Background cleanup: Remove player from Firebase or delete solo room
     if (roomCode && playerId) {
       try {
         const room = await db.get(`rooms/${roomCode}`);
         if (room && room.players) {
           const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
-          if (remainingPlayers.length === 0) {
-            // 0 players remaining: completely delete rooms/{roomCode} so room URL is destroyed
+          const isLobby = !room.meta || room.meta.status === "lobby" || room.meta.status === "waiting";
+          if (remainingPlayers.length === 0 || (isLobby && (this.isHost || remainingPlayers.length <= 1))) {
+            // Delete room completely if empty or if left during solo lobby
             await db.remove(`rooms/${roomCode}`);
           } else {
             const updates = {};
@@ -966,12 +1096,14 @@ class GameController {
             // Host Migration: assign host to next connected player so room never becomes hostless
             if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
               const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
-              updates[`players/${nextHost.id}/isHost`] = true;
-              updates[`meta/hostId`] = nextHost.id;
-              updates[`game/lastAction`] = {
-                text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
-                timestamp: Date.now()
-              };
+              if (nextHost) {
+                updates[`players/${nextHost.id}/isHost`] = true;
+                updates[`meta/hostId`] = nextHost.id;
+                updates[`game/lastAction`] = {
+                  text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
+                  timestamp: Date.now()
+                };
+              }
             }
 
             await db.update(`rooms/${roomCode}`, updates);
@@ -982,56 +1114,13 @@ class GameController {
           }
         }
       } catch (err) {
-        console.warn("[Ta5mena] Error during leave:", err);
+        console.warn("[Ta5mena] Error during background leave:", err);
       }
     }
-
-    // 3. Wipe room session from localStorage & reset state
-    this.discardSession();
-    this.currentRoomCode = null;
-    this.roomData = null;
-    this.isHost = false;
-
-    // 4. Reset URL back to base homepage
-    this.updateRoomUrl(null);
-
-    // 5. Clean up UI elements & switch to Home Screen
-    this.btnHeaderMyList?.classList.add("hidden");
-    this.btnHeaderLeave?.classList.add("hidden");
-    this.modalMyList?.classList.remove("open");
-    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
-    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
-    this.hidePauseOverlay();
-    this.closeGiveHintModal();
-    this.closeConfirmModal();
-    this.switchView("home");
   }
 
   leaveRoom() {
-    if (this.roomUnsubscribe) {
-      try { this.roomUnsubscribe(); } catch (e) {}
-      this.roomUnsubscribe = null;
-    }
-    if (this.currentRoomCode) {
-      try { db.off(`rooms/${this.currentRoomCode}`); } catch (e) {}
-    }
-    if (this.currentRoomCode && this.myPlayerId) {
-      try { db.stopPlayerConnectionTracking(this.currentRoomCode, this.myPlayerId); } catch (e) {}
-    }
-    this.discardSession();
-    this.currentRoomCode = null;
-    this.roomData = null;
-    this.isHost = false;
-    this.updateRoomUrl(null);
-    this.btnHeaderMyList?.classList.add("hidden");
-    this.btnHeaderLeave?.classList.add("hidden");
-    this.modalMyList?.classList.remove("open");
-    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
-    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
-    this.hidePauseOverlay();
-    this.closeGiveHintModal();
-    this.closeConfirmModal();
-    this.switchView("home");
+    this.executeLeaveRoom();
   }
 
   // ==========================================================================
@@ -1204,12 +1293,12 @@ class GameController {
     Object.entries(room.players).forEach(([pid, p]) => {
       if (p.hints) {
         Object.entries(p.hints).forEach(([slotRank, hint]) => {
-          const hintKey = `${pid}_${slotRank}_${hint.timestamp}`;
+          const hintKey = `${pid}_${slotRank}_${hint.timestamp || ''}_${hint.text || ''}`;
           if (!this.seenHints.has(hintKey)) {
             this.seenHints.add(hintKey);
-            // If dropped by an opponent, show toast
-            if (pid !== this.myPlayerId && hint.timestamp > (this.connectedTimestamp - 5000)) {
-              this.showAlert(`${p.name} dropped a hint for their #${slotRank} slot!`);
+            // If dropped by an opponent, show toast: "[Player Name] gave a hint for their #4 pick: Starts with 'A'!"
+            if (pid !== this.myPlayerId && (!hint.timestamp || hint.timestamp > (this.connectedTimestamp - 5000))) {
+              this.showAlert(`${p.name} gave a hint for their #${slotRank} pick: ${hint.text}!`);
             }
           }
         });
@@ -1229,9 +1318,12 @@ class GameController {
     const firstLetterHint = `Starts with '${firstChar.toUpperCase()}'`;
     this.hintFirstLetterPreview.textContent = firstLetterHint;
 
-    // Option 2 preview: Word count & length
+    // Option 2 preview: Word count & letter count: "X word(s), Y letters"
     const words = cleanItem.split(/\s+/).filter(w => w.length > 0);
-    const wordCountText = `${words.length} ${words.length === 1 ? 'word' : 'words'} (${words.map(w => `${w.length} letters`).join(", ")})`;
+    const totalLetters = cleanItem.replace(/\s+/g, "").length;
+    const wordText = words.length === 1 ? "1 word" : `${words.length} words`;
+    const letterText = totalLetters === 1 ? "1 letter" : `${totalLetters} letters`;
+    const wordCountText = `${wordText}, ${letterText}`;
     this.hintWordCountPreview.textContent = wordCountText;
 
     this.modalGiveHint.classList.add("open");
@@ -1258,14 +1350,17 @@ class GameController {
     const { rank, item } = this.activeHintTargetSlot;
     const cleanItem = (item || "").trim().replace(/^["']/, "");
     const words = cleanItem.split(/\s+/).filter(w => w.length > 0);
-    const hintText = `${words.length} ${words.length === 1 ? 'word' : 'words'} (${words.map(w => `${w.length} letters`).join(", ")})`;
+    const totalLetters = cleanItem.replace(/\s+/g, "").length;
+    const wordText = words.length === 1 ? "1 word" : `${words.length} words`;
+    const letterText = totalLetters === 1 ? "1 letter" : `${totalLetters} letters`;
+    const hintText = `${wordText}, ${letterText}`;
     await this.broadcastHint(rank, "word_count", hintText);
   }
 
   async submitCustomHint() {
     if (!this.activeHintTargetSlot) return;
     const { rank, item } = this.activeHintTargetSlot;
-    const customVal = this.inputCustomHint.value.trim();
+    const customVal = this.inputCustomHint.value.trim().slice(0, 30);
 
     if (!customVal) {
       this.customHintError.textContent = "Please enter a short clue.";
@@ -1295,14 +1390,14 @@ class GameController {
     const updates = {};
     updates[`players/${this.myPlayerId}/hints/${rank}`] = hintData;
     updates[`game/lastAction`] = {
-      text: `${this.myPlayerName} dropped a hint for their #${rank} slot!`,
+      text: `${this.myPlayerName} gave a hint for their #${rank} pick: ${hintText}!`,
       timestamp: Date.now()
     };
     updates["lastActivity"] = Date.now();
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
     this.closeGiveHintModal();
-    this.showAlert(`Hint broadcast for slot #${rank}: "${hintText}"`);
+    this.showAlert(`Hint broadcast for #${rank} pick: "${hintText}"`);
 
     if (this.modalMyList.classList.contains("open")) {
       this.renderMyListDrawer();
@@ -1435,6 +1530,16 @@ class GameController {
       this.lobbyPlayerList.appendChild(item);
     });
 
+    // Solo lobby disconnect policy: if <= 1 connected player in lobby, register onDisconnect().remove() on whole room
+    if (this.isHost && this.currentRoomCode) {
+      const connectedCount = players.filter(p => p.connected !== false).length;
+      if (connectedCount <= 1) {
+        db.registerSoloLobbyDisconnect(this.currentRoomCode);
+      } else {
+        db.cancelSoloLobbyDisconnect(this.currentRoomCode);
+      }
+    }
+
     // Min players check (3 minimum as strictly required)
     const canStart = playerCount >= 3;
     if (this.isHost) {
@@ -1498,6 +1603,7 @@ class GameController {
       return;
     }
 
+    await db.cancelSoloLobbyDisconnect(this.currentRoomCode);
     await db.update(`rooms/${this.currentRoomCode}/meta`, { status: "entry" });
     await this.touchRoomActivity();
   }
@@ -1965,36 +2071,58 @@ class GameController {
   // HOST SKIP TURN LOGIC
   // --------------------------------------------------------------------------
 
-  handleHostSkipTurn() {
-    if (!this.isHost || !this.roomData || this.roomData.meta?.status !== "playing") return;
+  async hostSkipTurn() {
+    if (!this.isHost || !this.currentRoomCode || !this.roomData || this.roomData.meta?.status !== "playing") return;
     const game = this.roomData.game || {};
     const turnOrder = game.turnOrder || [];
-    const activePlayerId = game.activePlayerId || turnOrder[game.currentTurnIndex || 0];
+    if (!turnOrder || turnOrder.length === 0) return;
+
+    const currentIndex = (typeof game.currentTurnIndex === "number") 
+      ? game.currentTurnIndex 
+      : ((typeof game.turnIndex === "number") ? game.turnIndex : 0);
+    
+    const activePlayerId = game.activePlayerId || game.currentTurnPlayerId || turnOrder[currentIndex] || turnOrder[0];
     const activeP = this.roomData.players ? this.roomData.players[activePlayerId] : null;
-    const activeName = activeP ? activeP.name : "Current Player";
+    const activeName = activeP ? activeP.name : "Player";
 
-    this.showConfirmModal({
-      title: "SKIP TURN",
-      message: `Skip ${activeName}'s turn?`,
-      confirmText: "SKIP TURN",
-      confirmClass: "btn-danger",
-      onConfirm: () => this.executeSkipTurn(activePlayerId, activeName)
-    });
-  }
+    let nextIndex = (currentIndex + 1) % turnOrder.length;
+    let nextRound = game.round || 1;
+    if (nextIndex === 0) {
+      nextRound += 1;
+    }
 
-  async executeSkipTurn(activePlayerId, activePlayerName) {
-    if (!this.isHost || !this.currentRoomCode) return;
+    if (this.isSoleRemainingPlayer(turnOrder[nextIndex], this.roomData)) {
+      nextIndex = (nextIndex + 1) % turnOrder.length;
+    }
+
+    const nextActivePlayerId = turnOrder[nextIndex];
+
     const updates = {
+      "game/currentTurnIndex": nextIndex,
+      "game/turnIndex": nextIndex,
+      "game/activePlayerId": nextActivePlayerId,
+      "game/currentTurnPlayerId": nextActivePlayerId,
+      "game/round": nextRound,
       "game/confirmation": null,
+      "game/waiting_for_confirmation": null,
+      "game/pendingGuess": null,
       "game/lastAction": {
-        text: `Host skipped ${activePlayerName}'s turn.`,
+        text: `Host skipped ${activeName}'s turn.`,
         timestamp: Date.now()
       },
       "lastActivity": Date.now()
     };
+
     await db.update(`rooms/${this.currentRoomCode}`, updates);
-    await this.advanceTurn();
-    this.showAlert(`Skipped ${activePlayerName}'s turn.`);
+    this.showAlert(`Host skipped ${activeName}'s turn.`);
+  }
+
+  handleHostSkipTurn() {
+    this.hostSkipTurn();
+  }
+
+  executeSkipTurn(activePlayerId, activePlayerName) {
+    this.hostSkipTurn();
   }
 
   // --------------------------------------------------------------------------
@@ -2539,7 +2667,7 @@ class GameController {
         const hint = myHints[r];
         const hintBadge = hint ? `<span class="board-slot-hint"><span class="hint-badge-tag">HINT</span> ${this.escapeHtml(hint.text)}</span>` : '';
         const giveHintBtn = !slot.revealed
-          ? `<button type="button" class="btn btn-sm ${hint ? '' : 'btn-primary'} btn-hint btn-board-hint" data-rank="${r}">${hint ? 'EDIT HINT' : 'GIVE HINT'}</button>`
+          ? `<button type="button" class="btn btn-sm ${hint ? '' : 'btn-primary'} btn-hint btn-board-hint" data-rank="${r}">[ ${hint ? 'EDIT HINT' : 'DROP HINT'} ]</button>`
           : '';
 
         itemEl.innerHTML = `
@@ -2574,15 +2702,15 @@ class GameController {
         } else {
           itemEl.className = "board-slot-item locked";
           const hint = targetHints[r];
-          const hintHtml = hint
-            ? `<div class="board-slot-hint"><span class="hint-badge-tag">HINT</span> ${this.escapeHtml(hint.text)}</div>`
+          const hintBadge = hint
+            ? `<span class="board-slot-hint-bright">• HINT: ${this.escapeHtml(hint.text)}</span>`
             : '';
 
           itemEl.innerHTML = `
             <div class="board-slot-rank">#${r}</div>
             <div class="board-slot-content">
               <span class="board-slot-name">[ HIDDEN - ${r} PTS ]</span>
-              ${hintHtml}
+              ${hintBadge}
             </div>
             <div class="board-slot-pts">${r} pts</div>
           `;
@@ -2773,7 +2901,7 @@ class GameController {
         const hintBadge = hint 
           ? `<span class="my-list-hint-tag">HINT: ${this.escapeHtml(hint.text)}</span>` 
           : `<span class="badge">[ HIDDEN - ${r} PTS ]</span>`;
-        const hintBtn = `<button type="button" class="btn btn-sm ${hint ? '' : 'btn-primary'} btn-hint btn-drawer-hint" data-rank="${r}">${hint ? 'EDIT HINT' : 'GIVE HINT'}</button>`;
+        const hintBtn = `<button type="button" class="btn btn-sm ${hint ? '' : 'btn-primary'} btn-hint btn-drawer-hint" data-rank="${r}">[ ${hint ? 'EDIT HINT' : 'DROP HINT'} ]</button>`;
         actionOrHint = `<div style="display: flex; align-items: center; gap: 6px;">${hintBadge}${hintBtn}</div>`;
       }
 
