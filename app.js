@@ -415,7 +415,12 @@ class GameController {
     this.btnCreateRoom.addEventListener("click", () => this.handleCreateRoom());
     this.btnJoinRoom.addEventListener("click", () => this.handleJoinRoom());
     this.inputRoomCode.addEventListener("input", (e) => {
-      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+    });
+    this.inputRoomCode.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        this.handleJoinRoom();
+      }
     });
     this.btnReconnect.addEventListener("click", () => this.handleReconnect());
     this.btnDiscardSession.addEventListener("click", () => this.discardSession());
@@ -627,7 +632,7 @@ class GameController {
 
   async handleJoinRoom() {
     const name = this.inputPlayerName.value.trim();
-    const code = this.inputRoomCode.value.trim().toUpperCase();
+    const code = this.inputRoomCode.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
 
     if (!name) {
       this.showAlert("Please enter your name first.");
@@ -1184,15 +1189,15 @@ class GameController {
   // ==========================================================================
 
   getCategoryTitle(cat) {
-    if (cat === "singers") return "Top 10 Favorite Singers";
-    if (cat === "football") return "Top 10 Football Players";
-    if (cat === "actors") return "Top 10 Actors";
-    if (cat === "clubs") return "Top 10 Football Clubs";
-    if (cat === "countries") return "Top 10 Countries";
-    if (cat === "series") return "Top 10 Series";
-    if (cat === "movies") return "Top 10 Movies";
-    if (cat === "foods") return "Top 10 Foods";
-    return "Top 10 List";
+    if (cat === "singers") return "Singers";
+    if (cat === "football") return "Footballers";
+    if (cat === "actors") return "Actors";
+    if (cat === "clubs") return "Football Clubs";
+    if (cat === "countries") return "Countries";
+    if (cat === "series") return "Series";
+    if (cat === "movies") return "Movies";
+    if (cat === "foods") return "Foods";
+    return "Category";
   }
 
   renderEntryPhase(room) {
@@ -1399,7 +1404,7 @@ class GameController {
       const filled = Object.values(items).filter(v => typeof v === "string" && v.trim().length > 0);
       if (filled.length > 0) {
         const catKey = data.category || cat;
-        this.restoreCategoryLabel.textContent = catKey.toUpperCase().replace(/_/g, " ");
+        this.restoreCategoryLabel.textContent = this.getCategoryTitle(catKey).toUpperCase();
         this.restoreBanner.classList.remove("hidden");
       } else {
         this.restoreBanner.classList.add("hidden");
@@ -2190,7 +2195,7 @@ class GameController {
       }
 
       card.innerHTML = `
-        <div style="font-weight: 700; margin-bottom: 8px;">${this.escapeHtml(p.name)}'s Top 10</div>
+        <div style="font-weight: 700; margin-bottom: 8px;">${this.escapeHtml(p.name)}'s List</div>
         <div>${slotsHtml}</div>
       `;
       this.finalAllListsContainer.appendChild(card);

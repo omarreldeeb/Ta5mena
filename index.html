@@ -72,9 +72,9 @@
           <!-- Join Room Panel -->
           <div class="panel-box">
             <h3>JOIN EXISTING ROOM</h3>
-            <p class="text-secondary" style="font-size: 13px;">Enter the 4-letter room code shared by your host.</p>
+            <p class="text-secondary" style="font-size: 13px;">Enter the 4-character room code shared by your host.</p>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
+              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
               <button id="btn-join-room" class="btn btn-block" style="flex: 1;">Join Room</button>
             </div>
           </div>
@@ -113,36 +113,36 @@
 
           <div class="category-selection-grid">
             <button class="category-option-btn selected" data-category="singers">
-              <span class="category-title">Top 10 Singers</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+              <span class="category-title">Singers</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Worldwide Icons</span>
             </button>
             <button class="category-option-btn" data-category="football">
-              <span class="category-title">Top 10 Footballers</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+              <span class="category-title">Footballers</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global Legends</span>
             </button>
             <button class="category-option-btn" data-category="actors">
-              <span class="category-title">Top 10 Actors</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+              <span class="category-title">Actors</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Screen Stars</span>
             </button>
             <button class="category-option-btn" data-category="clubs">
               <span class="category-title">Football Clubs</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian, Arab and Global</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">All Eras & Leagues</span>
             </button>
             <button class="category-option-btn" data-category="countries">
               <span class="category-title">Countries</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global & International</span>
             </button>
             <button class="category-option-btn" data-category="series">
-              <span class="category-title">Top 10 Series</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab, Anime and Global</span>
+              <span class="category-title">Series</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Iconic TV & Shows</span>
             </button>
             <button class="category-option-btn" data-category="movies">
-              <span class="category-title">Top 10 Movies</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian and Global</span>
+              <span class="category-title">Movies</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global Cinema</span>
             </button>
             <button class="category-option-btn" data-category="foods">
-              <span class="category-title">Top 10 Foods</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian, Arab and Fast Food</span>
+              <span class="category-title">Foods</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">World Cuisines & Dishes</span>
             </button>
           </div>
         </div>
@@ -179,7 +179,7 @@
         <div class="flex-between">
           <div>
             <div class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">SECRET LIST BUILDER</div>
-            <h2 id="entry-category-title" style="font-size: 17px; margin-top: 2px;">Top 10 Favorite Singers</h2>
+            <h2 id="entry-category-title" style="font-size: 17px; margin-top: 2px;">Singers</h2>
           </div>
           <span class="badge badge-accent">RANK = POINTS</span>
         </div>
@@ -496,7 +496,7 @@
             <label for="input-custom-hint" style="display: block; font-weight: 700; font-size: 13px; margin-bottom: 4px;">Option 3: Custom Short Hint</label>
             <span class="text-secondary" style="font-size: 11px; display: block; margin-bottom: 6px;">Max 30 characters. Clue only - do not type the exact answer.</span>
             <div style="display: flex; gap: 6px;">
-              <input type="text" id="input-custom-hint" placeholder="e.g. Egyptian rapper" maxlength="30" style="flex: 1;">
+              <input type="text" id="input-custom-hint" placeholder="e.g. Famous artist" maxlength="30" style="flex: 1;">
               <button id="btn-submit-custom-hint" type="button" class="btn btn-primary btn-sm">Send</button>
             </div>
             <div id="custom-hint-error" class="hidden" style="color: var(--danger); font-size: 11px; margin-top: 6px;"></div>
