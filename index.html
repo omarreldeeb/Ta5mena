@@ -114,15 +114,35 @@
           <div class="category-selection-grid">
             <button class="category-option-btn selected" data-category="singers">
               <span class="category-title">Top 10 Singers</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global Artists</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
             </button>
             <button class="category-option-btn" data-category="football">
               <span class="category-title">Top 10 Footballers</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global Stars</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
             </button>
             <button class="category-option-btn" data-category="actors">
               <span class="category-title">Top 10 Actors</span>
-              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and International</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+            </button>
+            <button class="category-option-btn" data-category="clubs">
+              <span class="category-title">Football Clubs</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian, Arab and Global</span>
+            </button>
+            <button class="category-option-btn" data-category="countries">
+              <span class="category-title">Countries</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab and Global</span>
+            </button>
+            <button class="category-option-btn" data-category="series">
+              <span class="category-title">Top 10 Series</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Arab, Anime and Global</span>
+            </button>
+            <button class="category-option-btn" data-category="movies">
+              <span class="category-title">Top 10 Movies</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian and Global</span>
+            </button>
+            <button class="category-option-btn" data-category="foods">
+              <span class="category-title">Top 10 Foods</span>
+              <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Egyptian, Arab and Fast Food</span>
             </button>
           </div>
         </div>
@@ -406,6 +426,82 @@
         </div>
 
         <button id="btn-dismiss-my-list" class="btn btn-block">Back to Game</button>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: GAME PAUSED OVERLAY (DISCONNECT PAUSE) -->
+    <!-- ===================================================================== -->
+    <div id="modal-pause-overlay" class="modal-backdrop">
+      <div class="confirm-modal-box pause-modal-box">
+        <div class="flex-between">
+          <span class="badge badge-accent">MATCH PAUSED</span>
+          <span id="pause-room-code-tag" class="badge">ROOM: ----</span>
+        </div>
+
+        <h2 style="font-size: 18px; margin-top: 6px; letter-spacing: 0.04em;">GAME PAUSED</h2>
+
+        <div id="pause-overlay-message" class="pause-message">
+          Waiting for <strong id="pause-disconnected-names" class="text-accent">Player</strong> to reconnect...
+        </div>
+
+        <p class="text-secondary" style="font-size: 12px; margin-top: 4px;">
+          All scores, turns, and Top 10 lists are locked. The match will automatically resume as soon as they reconnect.
+        </p>
+
+        <!-- Host only action panel -->
+        <div id="pause-host-actions" class="pause-host-panel hidden">
+          <div style="font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--text-secondary); margin-bottom: 8px;">
+            HOST CONTROLS
+          </div>
+          <div id="pause-kick-buttons-container" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: GIVE HINT MODAL -->
+    <!-- ===================================================================== -->
+    <div id="modal-give-hint" class="modal-backdrop">
+      <div class="confirm-modal-box" style="max-width: 480px;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+          <div>
+            <span class="badge badge-accent">BROADCAST CLUE</span>
+            <h3 id="hint-modal-slot-title" style="font-size: 15px; margin-top: 4px;">Give Hint for Slot #1</h3>
+          </div>
+          <button id="btn-close-give-hint" class="btn btn-sm">Close</button>
+        </div>
+
+        <p class="text-secondary" style="font-size: 12px; margin-top: 4px;">
+          Select a hint to display publicly on your opponents' board for this slot:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+          <!-- Option 1: Reveal First Letter -->
+          <button id="btn-hint-first-letter" type="button" class="btn btn-block hint-option-btn">
+            <span style="font-weight: 700; font-size: 13px;">Option 1: Reveal First Letter</span>
+            <span id="hint-first-letter-preview" class="text-accent" style="font-size: 12px; font-family: var(--font-mono); margin-top: 2px;">Starts with '...'</span>
+          </button>
+
+          <!-- Option 2: Reveal Word Count & Length -->
+          <button id="btn-hint-word-count" type="button" class="btn btn-block hint-option-btn">
+            <span style="font-weight: 700; font-size: 13px;">Option 2: Reveal Word Count & Length</span>
+            <span id="hint-word-count-preview" class="text-accent" style="font-size: 12px; font-family: var(--font-mono); margin-top: 2px;">... words (... letters)</span>
+          </button>
+
+          <!-- Option 3: Custom Short Hint -->
+          <div class="custom-hint-panel">
+            <label for="input-custom-hint" style="display: block; font-weight: 700; font-size: 13px; margin-bottom: 4px;">Option 3: Custom Short Hint</label>
+            <span class="text-secondary" style="font-size: 11px; display: block; margin-bottom: 6px;">Max 30 characters. Clue only - do not type the exact answer.</span>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="input-custom-hint" placeholder="e.g. Egyptian rapper" maxlength="30" style="flex: 1;">
+              <button id="btn-submit-custom-hint" type="button" class="btn btn-primary btn-sm">Send</button>
+            </div>
+            <div id="custom-hint-error" class="hidden" style="color: var(--danger); font-size: 11px; margin-top: 6px;"></div>
+          </div>
+        </div>
       </div>
     </div>
 
