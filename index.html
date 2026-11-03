@@ -60,44 +60,169 @@
     <!-- VIEW 1: HOME & RECONNECT SCREEN -->
     <!-- ===================================================================== -->
     <main id="view-home" class="view-section active">
-      <!-- Reconnect Box (Visible if saved session exists) -->
-      <div id="reconnect-box" class="reconnect-card hidden">
-        <div>
-          <div class="text-secondary" style="font-size: 12px; font-weight: 700;">ACTIVE SESSION FOUND</div>
-          <div style="font-size: 14px; font-weight: 600;">Rejoin Room <strong id="reconnect-room-label" class="text-accent">----</strong> as <strong id="reconnect-name-label">----</strong></div>
+      <!-- MODE SELECTOR TABS -->
+      <div class="mode-selector-tabs mb-12">
+        <button id="tab-mode-online" type="button" class="mode-tab-btn active">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>ONLINE MULTIPLAYER</span>
+        </button>
+        <button id="tab-mode-local" type="button" class="mode-tab-btn">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <span>1-DEVICE (PASS & PLAY)</span>
+        </button>
+      </div>
+
+      <!-- PANEL 1: ONLINE MODE -->
+      <div id="panel-mode-online">
+        <!-- Reconnect Box (Visible if saved session exists) -->
+        <div id="reconnect-box" class="reconnect-card hidden">
+          <div>
+            <div class="text-secondary" style="font-size: 12px; font-weight: 700;">ACTIVE SESSION FOUND</div>
+            <div style="font-size: 14px; font-weight: 600;">Rejoin Room <strong id="reconnect-room-label" class="text-accent">----</strong> as <strong id="reconnect-name-label">----</strong></div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-reconnect" class="btn btn-primary btn-sm">Rejoin</button>
+            <button id="btn-discard-session" class="btn btn-sm">Clear</button>
+          </div>
         </div>
-        <div style="display: flex; gap: 6px;">
-          <button id="btn-reconnect" class="btn btn-primary btn-sm">Rejoin</button>
-          <button id="btn-discard-session" class="btn btn-sm">Clear</button>
+
+        <div class="card home-card">
+          <div>
+            <label for="input-player-name" style="display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px;">YOUR NAME</label>
+            <input type="text" id="input-player-name" placeholder="Enter your display name" maxlength="20" autocomplete="off">
+          </div>
+
+          <div class="home-grid">
+            <!-- Create Room Panel -->
+            <div class="panel-box">
+              <h3>HOST NEW MATCH</h3>
+              <p class="text-secondary" style="font-size: 13px;">Create a private room, pick a category, and invite at least 2 friends.</p>
+              <button id="btn-create-room" class="btn btn-primary btn-block">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                Create Room
+              </button>
+            </div>
+
+            <!-- Join Room Panel -->
+            <div class="panel-box">
+              <h3>JOIN EXISTING ROOM</h3>
+              <p class="text-secondary" style="font-size: 13px;">Enter the 4-letter room code shared by your host.</p>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" pattern="[A-Za-z]{4}" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
+                <button id="btn-join-room" class="btn btn-block" style="flex: 1;">Join Room</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card home-card">
-        <div>
-          <label for="input-player-name" style="display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px;">YOUR NAME</label>
-          <input type="text" id="input-player-name" placeholder="Enter your display name" maxlength="20" autocomplete="off">
+      <!-- PANEL 2: 1-DEVICE (PASS & PLAY) SETUP -->
+      <div id="panel-mode-local" class="hidden">
+        <!-- Local Reconnect Box (Visible if saved local match exists) -->
+        <div id="local-reconnect-box" class="reconnect-card hidden mb-12">
+          <div>
+            <div class="text-secondary" style="font-size: 12px; font-weight: 700;">SAVED LOCAL MATCH</div>
+            <div style="font-size: 14px; font-weight: 600;">Resume 1-Device Match (<strong id="local-reconnect-info" class="text-accent">3 Players</strong>)</div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-local-resume" class="btn btn-primary btn-sm">Resume</button>
+            <button id="btn-local-discard" class="btn btn-sm">Discard</button>
+          </div>
         </div>
 
-        <div class="home-grid">
-          <!-- Create Room Panel -->
-          <div class="panel-box">
-            <h3>HOST NEW MATCH</h3>
-            <p class="text-secondary" style="font-size: 13px;">Create a private room, pick a category, and invite at least 2 friends.</p>
-            <button id="btn-create-room" class="btn btn-primary btn-block">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-              Create Room
-            </button>
+        <div class="card">
+          <div class="flex-between mb-12" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+            <div>
+              <span class="badge badge-accent">LOCAL MULTIPLAYER</span>
+              <h2 style="font-size: 18px; margin-top: 4px;">1-Device Pass & Play Setup</h2>
+            </div>
+            <span class="text-secondary mono" style="font-size: 11px;">1 PHONE / SCREEN</span>
           </div>
 
-          <!-- Join Room Panel -->
-          <div class="panel-box">
-            <h3>JOIN EXISTING ROOM</h3>
-            <p class="text-secondary" style="font-size: 13px;">Enter the 4-letter room code shared by your host.</p>
-            <div style="display: flex; gap: 8px;">
-              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" pattern="[A-Za-z]{4}" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
-              <button id="btn-join-room" class="btn btn-block" style="flex: 1;">Join Room</button>
+          <!-- Number of Players Stepper -->
+          <div class="local-setup-section mb-12">
+            <div class="flex-between">
+              <label style="font-weight: 700; font-size: 13px;">NUMBER OF PLAYERS</label>
+              <span class="badge">MIN 3 - MAX 10</span>
+            </div>
+            <div class="local-count-control-row mt-8">
+              <button id="btn-local-count-minus" type="button" class="btn btn-count-step" aria-label="Decrease players">-</button>
+              <div class="local-count-display-box">
+                <span id="local-player-count-display">3</span>
+                <span class="local-count-unit">PLAYERS</span>
+              </div>
+              <button id="btn-local-count-plus" type="button" class="btn btn-count-step" aria-label="Increase players">+</button>
             </div>
           </div>
+
+          <!-- Player Names Input List -->
+          <div class="local-setup-section mb-12">
+            <label style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 8px;">PLAYER NAMES</label>
+            <div id="local-player-names-list" class="local-names-grid">
+              <!-- Dynamically populated name inputs -->
+            </div>
+          </div>
+
+          <!-- Category Selection -->
+          <div class="local-setup-section mb-12">
+            <div class="flex-between mb-8">
+              <label style="font-weight: 700; font-size: 13px;">MATCH CATEGORY</label>
+              <span class="badge">9 CATEGORIES</span>
+            </div>
+            <div id="local-category-grid" class="category-selection-grid">
+              <button type="button" class="category-option-btn selected" data-category="singers">
+                <span class="category-title">Singers</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Worldwide Icons</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="football">
+                <span class="category-title">Footballers</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global Legends</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="actors">
+                <span class="category-title">Actors</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Screen Stars</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="clubs">
+                <span class="category-title">Football Clubs</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">All Eras & Leagues</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="countries">
+                <span class="category-title">Countries</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global & International</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="series">
+                <span class="category-title">Series</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Iconic TV & Shows</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="movies">
+                <span class="category-title">Movies</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Global Cinema</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="foods">
+                <span class="category-title">Foods</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">World Cuisines & Dishes</span>
+              </button>
+              <button type="button" class="category-option-btn" data-category="custom">
+                <span class="category-title">Custom Topic</span>
+                <span class="text-secondary" style="font-size: 11px; margin-top: 2px;">Your Choice</span>
+              </button>
+            </div>
+
+            <!-- Custom Category Input for Local Mode -->
+            <div id="local-custom-category-box" class="custom-category-container hidden mt-8">
+              <label for="input-local-custom-category-title" style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                ENTER CUSTOM TOPIC TITLE
+              </label>
+              <input type="text" id="input-local-custom-category-title" placeholder="e.g. Video Games, Anime, Restaurants..." maxlength="30" autocomplete="off">
+            </div>
+          </div>
+
+          <div id="local-setup-error-banner" class="entry-notice mb-12 hidden" style="border-left-color: var(--danger); color: var(--danger);"></div>
+
+          <button id="btn-start-local-match" type="button" class="btn btn-primary btn-block btn-lg">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            START PASS & PLAY
+          </button>
         </div>
       </div>
     </main>
@@ -292,8 +417,11 @@
       <!-- ACTIVE PLAYER GUESSING CONTROL BOX (When it's your turn) -->
       <div id="active-turn-control" class="control-box hidden">
         <div class="control-box-header">
-          <span class="control-box-title">YOUR TURN: GUESS AN OPPONENT'S ITEM</span>
-          <span class="badge badge-accent">1 GUESS ONLY</span>
+          <span class="control-box-title" id="active-turn-control-title">YOUR TURN: GUESS AN OPPONENT'S ITEM</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btn-active-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
+            <span class="badge badge-accent">1 GUESS ONLY</span>
+          </div>
         </div>
 
         <div>
@@ -617,6 +745,134 @@
         <div class="flex-between gap-8 mt-8">
           <button id="btn-modal-cancel" type="button" class="btn btn-block">CANCEL</button>
           <button id="btn-modal-confirm-action" type="button" class="btn btn-danger btn-block">CONFIRM</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: PRIVACY INTERSTITIAL ("PASS PHONE" CURTAIN) -->
+    <!-- ===================================================================== -->
+    <div id="modal-privacy-curtain" class="modal-backdrop modal-privacy-backdrop">
+      <div class="privacy-curtain-card">
+        <span class="badge badge-accent mb-12" style="font-weight: 800; letter-spacing: 0.5px;">1-DEVICE PASS & PLAY</span>
+        <div class="privacy-curtain-icon-wrap">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#FF4D00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            <polyline points="15 6 18 9 15 12"></polyline>
+            <path d="M18 9H9"></path>
+          </svg>
+        </div>
+        <h2 id="privacy-curtain-title" class="privacy-curtain-title">PASS THE PHONE TO <span id="privacy-curtain-player-name">PLAYER</span></h2>
+        <p id="privacy-curtain-subtitle" class="privacy-curtain-subtitle">
+          Everyone else, look away! Your picks and turns are completely secret.
+        </p>
+        <button id="btn-privacy-curtain-proceed" type="button" class="btn btn-primary btn-block btn-lg mt-16">
+          I AM <span id="privacy-curtain-action-name">PLAYER</span> - ENTER MY LIST
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: 1-DEVICE PRIVACY REVEAL WARNING MODAL (FOR MY LIST & HINTS) -->
+    <!-- ===================================================================== -->
+    <div id="modal-local-reveal-confirm" class="modal-backdrop">
+      <div class="confirm-modal-box sharp-modal-box" style="max-width: 440px; width: 92%;">
+        <div class="flex-between mb-8" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <span class="badge badge-accent">CONFIRM PRIVATE VIEW</span>
+          <span id="local-reveal-player-tag" style="font-weight: 700; font-size: 13px;">Player Name</span>
+        </div>
+        <h3 id="local-reveal-title" style="font-size: 16px; margin-bottom: 6px;">Reveal Secret List?</h3>
+        <p id="local-reveal-msg" class="text-secondary" style="font-size: 13px; margin-bottom: 16px;">
+          Make sure your friends are looking away from your screen before opening your private picks!
+        </p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button id="btn-local-reveal-cancel" type="button" class="btn">Cancel</button>
+          <button id="btn-local-reveal-confirm" type="button" class="btn btn-primary">REVEAL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: 1-DEVICE LAYER 3 VERIFICATION CHOICE MODAL -->
+    <!-- ===================================================================== -->
+    <div id="modal-local-verify-choice" class="modal-backdrop">
+      <div class="confirm-modal-box" style="max-width: 520px; width: 95%;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+          <div>
+            <span class="badge badge-accent">VERIFY GUESS</span>
+            <h3 style="font-size: 16px; margin-top: 4px;">Confirm Guess on Target's List</h3>
+          </div>
+          <span id="local-verify-choice-target-badge" class="badge">TARGET: PLAYER</span>
+        </div>
+
+        <div style="margin: 12px 0; background: var(--bg-input); padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 4px;">
+          <div style="font-size: 12px; color: var(--text-secondary);">Guessed Word:</div>
+          <div id="local-verify-choice-guess-text" style="font-size: 18px; font-weight: 800; color: #FFFFFF; margin-top: 2px;">"Guess"</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+            Guessed by <strong id="local-verify-choice-guesser-name" class="text-accent">Guesser</strong> on <strong id="local-verify-choice-target-name">Target</strong>'s list.
+          </div>
+        </div>
+
+        <!-- Option B: Secret Verification Button -->
+        <button id="btn-local-verify-secret-pass" type="button" class="btn btn-primary btn-block" style="padding: 12px 14px; height: auto;">
+          <div style="font-weight: 800; font-size: 14px;">🔒 PASS TO <span id="local-verify-secret-target-btn-label">TARGET</span> TO VERIFY SECRETLY</div>
+          <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Hides screen and lets target secretly tap their matching slot or say no</div>
+        </button>
+
+        <div style="text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); margin: 12px 0 8px 0; display: flex; align-items: center; gap: 8px;">
+          <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
+          <span>OR QUICK ORAL CHECK (SITTING TOGETHER)</span>
+          <div style="flex: 1; height: 1px; background: var(--border-subtle);"></div>
+        </div>
+
+        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; text-align: center;">
+          Target can verbally say if it's on their list and which rank (#1 to #10):
+        </p>
+
+        <!-- Quick 10 rank buttons -->
+        <div id="local-verify-oral-ranks-container" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+          <!-- #1 (+1pt) to #10 (+10pts) -->
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+          <button id="btn-local-verify-oral-wrong" type="button" class="btn btn-danger-outline btn-block">
+            NOT ON MY LIST (0 PTS)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: 1-DEVICE SECRET TARGET SLOTS MODAL -->
+    <!-- ===================================================================== -->
+    <div id="modal-local-secret-target-slots" class="modal-backdrop">
+      <div class="confirm-modal-box" style="max-width: 520px; width: 95%;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+          <div>
+            <span class="badge badge-accent">SECRET VERIFICATION</span>
+            <h3 id="local-secret-slots-player-name" style="font-size: 16px; margin-top: 4px;">Player's List</h3>
+          </div>
+          <span class="badge badge-success">PRIVATE VIEW</span>
+        </div>
+
+        <div style="margin: 12px 0; background: var(--bg-input); padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 4px;">
+          <div style="font-size: 12px; color: var(--text-secondary);">Word to verify:</div>
+          <div id="local-secret-slots-guess-text" style="font-size: 18px; font-weight: 800; color: #FFFFFF; margin-top: 2px;">"Guess"</div>
+        </div>
+
+        <p class="text-secondary" style="font-size: 12px; margin-bottom: 8px;">
+          Tap the matching rank below to confirm it's on your list, or tap "Not on my list" below:
+        </p>
+
+        <div id="local-secret-slots-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow-y: auto;">
+          <!-- Target's unguessed slots with item names -->
+        </div>
+
+        <div style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+          <button id="btn-local-secret-slots-wrong" type="button" class="btn btn-danger-outline btn-block">
+            NOT ON MY LIST (0 PTS)
+          </button>
         </div>
       </div>
     </div>

@@ -300,6 +300,17 @@ class GameController {
     this.toastFadeTimeout = null;
     this.lastSeenActionTimestamp = Date.now() - 3000;
 
+    // 1-Device Pass & Play (Local Multiplayer) state
+    this.isLocalMode = false;
+    this.localMatch = null;
+    this.localPlayerCount = 3;
+    this.localCategory = "singers";
+    this.localCustomCategory = "";
+    this.localCurrentEntryIndex = 0;
+    this.localCurtainProceedCallback = null;
+    this.localPendingVerify = null;
+    this.localRevealConfirmCallback = null;
+
     this.cacheDomElements();
     this.bindEvents();
     this.initAppRouting();
@@ -396,6 +407,8 @@ class GameController {
     this.gameRoundIndicator = document.getElementById("game-round-indicator");
     this.btnHostSkipTurnBar = document.getElementById("btn-host-skip-turn-bar");
     this.activeTurnControl = document.getElementById("active-turn-control");
+    this.activeTurnControlTitle = document.getElementById("active-turn-control-title");
+    this.btnActiveSkipTurn = document.getElementById("btn-active-skip-turn");
     this.passiveTurnBanner = document.getElementById("passive-turn-banner");
     this.passiveActivePlayerName = document.getElementById("passive-active-player-name");
     this.btnHostSkipTurn = document.getElementById("btn-host-skip-turn");
@@ -452,6 +465,59 @@ class GameController {
     this.btnReturnHome = document.getElementById("btn-return-home");
     this.btnPlayAgain = document.getElementById("btn-play-again");
     this.playAgainNote = document.getElementById("play-again-note");
+
+    // Mode Selector Tabs & Panels (Online vs 1-Device Pass & Play)
+    this.tabModeOnline = document.getElementById("tab-mode-online");
+    this.tabModeLocal = document.getElementById("tab-mode-local");
+    this.panelModeOnline = document.getElementById("panel-mode-online");
+    this.panelModeLocal = document.getElementById("panel-mode-local");
+
+    // 1-Device Setup Controls
+    this.localReconnectBox = document.getElementById("local-reconnect-box");
+    this.localReconnectInfo = document.getElementById("local-reconnect-info");
+    this.btnLocalResume = document.getElementById("btn-local-resume");
+    this.btnLocalDiscard = document.getElementById("btn-local-discard");
+    this.btnLocalCountMinus = document.getElementById("btn-local-count-minus");
+    this.btnLocalCountPlus = document.getElementById("btn-local-count-plus");
+    this.localPlayerCountDisplay = document.getElementById("local-player-count-display");
+    this.localPlayerNamesList = document.getElementById("local-player-names-list");
+    this.localCategoryGrid = document.getElementById("local-category-grid");
+    this.localCategoryBtns = document.querySelectorAll("#local-category-grid .category-option-btn");
+    this.localCustomCategoryBox = document.getElementById("local-custom-category-box");
+    this.inputLocalCustomCategoryTitle = document.getElementById("input-local-custom-category-title");
+    this.localSetupErrorBanner = document.getElementById("local-setup-error-banner");
+    this.btnStartLocalMatch = document.getElementById("btn-start-local-match");
+
+    // Privacy Interstitial Curtain Modal
+    this.modalPrivacyCurtain = document.getElementById("modal-privacy-curtain");
+    this.privacyCurtainPlayerName = document.getElementById("privacy-curtain-player-name");
+    this.privacyCurtainActionName = document.getElementById("privacy-curtain-action-name");
+    this.btnPrivacyCurtainProceed = document.getElementById("btn-privacy-curtain-proceed");
+
+    // Local Protected Reveal Confirmation Modal (My List & Hints in Pass & Play)
+    this.modalLocalRevealConfirm = document.getElementById("modal-local-reveal-confirm");
+    this.localRevealConfirmTitle = document.getElementById("local-reveal-confirm-title");
+    this.localRevealConfirmMessage = document.getElementById("local-reveal-confirm-message");
+    this.btnLocalRevealConfirm = document.getElementById("btn-local-reveal-confirm");
+    this.btnLocalRevealCancel = document.getElementById("btn-local-reveal-cancel");
+
+    // Local 3-Layer Verification Choice Modal (Option A Oral Check vs Option B Secret Pass)
+    this.modalLocalVerifyChoice = document.getElementById("modal-local-verify-choice");
+    this.localVerifyChoiceTargetBadge = document.getElementById("local-verify-choice-target-badge");
+    this.localVerifyChoiceGuessText = document.getElementById("local-verify-choice-guess-text");
+    this.localVerifyChoiceGuesserName = document.getElementById("local-verify-choice-guesser-name");
+    this.localVerifyChoiceTargetName = document.getElementById("local-verify-choice-target-name");
+    this.localVerifySecretTargetBtnLabel = document.getElementById("local-verify-secret-target-btn-label");
+    this.btnLocalVerifySecretPass = document.getElementById("btn-local-verify-secret-pass");
+    this.localVerifyOralRanksContainer = document.getElementById("local-verify-oral-ranks-container");
+    this.btnLocalVerifyOralWrong = document.getElementById("btn-local-verify-oral-wrong");
+
+    // Secret Target Slots Modal (Option B Secret Picker)
+    this.modalLocalSecretTargetSlots = document.getElementById("modal-local-secret-target-slots");
+    this.localSecretSlotsPlayerName = document.getElementById("local-secret-slots-player-name");
+    this.localSecretSlotsGuessText = document.getElementById("local-secret-slots-guess-text");
+    this.localSecretSlotsList = document.getElementById("local-secret-slots-list");
+    this.btnLocalSecretSlotsWrong = document.getElementById("btn-local-secret-slots-wrong");
   }
 
   bindEvents() {
@@ -480,7 +546,11 @@ class GameController {
       if (leaveTrigger) {
         e.preventDefault();
         e.stopPropagation();
-        this.executeLeaveRoom();
+        if (this.isLocalMode) {
+          this.handleLocalLeave();
+        } else {
+          this.executeLeaveRoom();
+        }
       }
     };
     document.addEventListener("pointerdown", handleImmediateLeave, { capture: true });
@@ -488,33 +558,41 @@ class GameController {
     document.addEventListener("click", handleImmediateLeave, { capture: true });
 
     if (this.btnHeaderLeave) {
-      this.btnHeaderLeave.addEventListener("pointerdown", (e) => {
+      const onHeaderLeaveClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.executeLeaveRoom();
-      });
-      this.btnHeaderLeave.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.executeLeaveRoom();
-      });
-      this.btnHeaderLeave.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.executeLeaveRoom();
-      });
+        if (this.isLocalMode) {
+          this.handleLocalLeave();
+        } else {
+          this.executeLeaveRoom();
+        }
+      };
+      this.btnHeaderLeave.addEventListener("pointerdown", onHeaderLeaveClick);
+      this.btnHeaderLeave.addEventListener("mousedown", onHeaderLeaveClick);
+      this.btnHeaderLeave.addEventListener("click", onHeaderLeaveClick);
     }
 
     // Window navigation sync
     window.addEventListener("hashchange", () => {
       const codeInUrl = this.getRoomCodeFromUrl();
-      if (!codeInUrl && this.currentRoomCode) {
+      if (!codeInUrl && this.currentRoomCode && !this.isLocalMode) {
         this.executeLeaveRoom();
       }
     });
 
     // Hints Hub Header Button & Modal Toggle
-    this.btnHeaderHints?.addEventListener("click", () => this.openHintsHubModal());
+    this.btnHeaderHints?.addEventListener("click", () => {
+      if (this.isLocalMode) {
+        const activeName = this.localMatch?.players?.[this.myPlayerId]?.name || "Active Player";
+        this.showLocalRevealConfirm(
+          "PROTECTED HINTS",
+          `Show hints for ${activeName}'s secret list? Make sure others aren't looking!`,
+          () => this.openHintsHubModal()
+        );
+      } else {
+        this.openHintsHubModal();
+      }
+    });
     this.btnCloseHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
     this.btnDismissHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
     this.modalHintsHub?.addEventListener("click", (e) => {
@@ -524,10 +602,21 @@ class GameController {
     });
 
     // My List Drawer Toggle
-    this.btnHeaderMyList.addEventListener("click", () => this.toggleMyListDrawer());
-    this.btnCloseMyList.addEventListener("click", () => this.toggleMyListDrawer(false));
-    this.btnDismissMyList.addEventListener("click", () => this.toggleMyListDrawer(false));
-    this.modalMyList.addEventListener("click", (e) => {
+    this.btnHeaderMyList?.addEventListener("click", () => {
+      if (this.isLocalMode) {
+        const activeName = this.localMatch?.players?.[this.myPlayerId]?.name || "Active Player";
+        this.showLocalRevealConfirm(
+          "PROTECTED LIST",
+          `Show ${activeName}'s secret list? Make sure others aren't looking!`,
+          () => this.toggleMyListDrawer(true)
+        );
+      } else {
+        this.toggleMyListDrawer();
+      }
+    });
+    this.btnCloseMyList?.addEventListener("click", () => this.toggleMyListDrawer(false));
+    this.btnDismissMyList?.addEventListener("click", () => this.toggleMyListDrawer(false));
+    this.modalMyList?.addEventListener("click", (e) => {
       if (e.target === this.modalMyList) {
         this.toggleMyListDrawer(false);
       }
@@ -605,9 +694,11 @@ class GameController {
     };
     this.btnHostSkipTurn?.addEventListener("click", onHostSkip);
     this.btnHostSkipTurn?.addEventListener("pointerdown", onHostSkip);
+    this.btnActiveSkipTurn?.addEventListener("click", onHostSkip);
+    this.btnActiveSkipTurn?.addEventListener("pointerdown", onHostSkip);
 
     document.addEventListener("click", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -615,7 +706,7 @@ class GameController {
       }
     });
     document.addEventListener("pointerdown", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -630,13 +721,51 @@ class GameController {
       }
     });
     this.btnSubmitGuess.addEventListener("click", () => this.handleSubmitTurnGuess());
-    this.btnToggleMyList?.addEventListener("click", () => this.toggleMySecretList());
+    this.btnToggleMyList?.addEventListener("click", () => {
+      if (this.isLocalMode) {
+        const activeName = this.localMatch?.players?.[this.myPlayerId]?.name || "Active Player";
+        this.showLocalRevealConfirm(
+          "PROTECTED LIST",
+          `Show ${activeName}'s secret list on the board? Make sure others aren't looking!`,
+          () => this.toggleMySecretList()
+        );
+      } else {
+        this.toggleMySecretList();
+      }
+    });
 
     // Confirmation Layer 3
     this.btnConfirmWrong.addEventListener("click", () => this.handleConfirmResponse(null));
 
     // Game Over
     this.btnPlayAgain.addEventListener("click", () => this.handlePlayAgain());
+
+    // 1-Device Pass & Play Mode Selectors & Controls
+    this.tabModeOnline?.addEventListener("click", () => this.switchHomeMode("online"));
+    this.tabModeLocal?.addEventListener("click", () => this.switchHomeMode("local"));
+    this.btnLocalCountMinus?.addEventListener("click", () => this.adjustLocalPlayerCount(-1));
+    this.btnLocalCountPlus?.addEventListener("click", () => this.adjustLocalPlayerCount(1));
+    this.localCategoryBtns.forEach(btn => {
+      btn.addEventListener("click", (e) => this.selectLocalCategory(e.currentTarget.dataset.category));
+    });
+    this.btnStartLocalMatch?.addEventListener("click", () => this.startLocalMatch());
+    this.btnLocalResume?.addEventListener("click", () => this.resumeLocalMatch());
+    this.btnLocalDiscard?.addEventListener("click", () => this.discardLocalMatch());
+
+    // Privacy Curtain Proceed
+    this.btnPrivacyCurtainProceed?.addEventListener("click", () => this.handlePrivacyCurtainProceed());
+
+    // Local Reveal Confirm
+    this.btnLocalRevealCancel?.addEventListener("click", () => this.closeLocalRevealConfirm());
+    this.btnLocalRevealConfirm?.addEventListener("click", () => this.confirmLocalReveal());
+    this.modalLocalRevealConfirm?.addEventListener("click", (e) => {
+      if (e.target === this.modalLocalRevealConfirm) this.closeLocalRevealConfirm();
+    });
+
+    // Local 3-Layer Verification Choice Modal
+    this.btnLocalVerifySecretPass?.addEventListener("click", () => this.openLocalSecretVerifyForTarget());
+    this.btnLocalVerifyOralWrong?.addEventListener("click", () => this.handleLocalVerifyWrong());
+    this.btnLocalSecretSlotsWrong?.addEventListener("click", () => this.handleLocalVerifyWrong());
 
     // Close autocompletes on outside click
     document.addEventListener("click", (e) => {
@@ -656,17 +785,27 @@ class GameController {
       this.views[viewName].classList.add("active");
     }
 
-    if (viewName === "home" || !this.currentRoomCode) {
-      this.headerRoomTag.classList.add("hidden");
+    if (viewName === "home" || (!this.currentRoomCode && !this.isLocalMode)) {
+      this.headerRoomTag?.classList.add("hidden");
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.add("hidden");
       if (this.btnHeaderHints) this.btnHeaderHints.classList.add("hidden");
+      if (this.btnHeaderMyList) this.btnHeaderMyList.classList.add("hidden");
     } else {
-      this.headerRoomTag.classList.remove("hidden");
-      this.headerRoomCode.textContent = this.currentRoomCode;
+      this.headerRoomTag?.classList.remove("hidden");
+      if (this.headerRoomCode) {
+        this.headerRoomCode.textContent = this.isLocalMode ? "PASS & PLAY" : this.currentRoomCode;
+      }
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.remove("hidden");
       if (this.btnHeaderHints) {
         if (viewName !== "game") {
           this.btnHeaderHints.classList.add("hidden");
+        } else if (this.roomData) {
+          this.updateMyListButtonVisibility(this.roomData);
+        }
+      }
+      if (this.btnHeaderMyList) {
+        if (this.isLocalMode && viewName === "game") {
+          this.btnHeaderMyList.classList.remove("hidden");
         } else if (this.roomData) {
           this.updateMyListButtonVisibility(this.roomData);
         }
@@ -914,6 +1053,10 @@ class GameController {
       this.inputPlayerName.value = savedName;
       this.myPlayerName = savedName;
     }
+
+    // Initialize local setup defaults
+    this.renderLocalPlayerInputs();
+    this.checkLocalMatchSaved();
 
     const roomCodeFromUrl = this.getRoomCodeFromUrl();
 
@@ -1678,13 +1821,38 @@ class GameController {
   }
 
   async broadcastHint(rank, type, hintText) {
-    if (!this.currentRoomCode || !this.myPlayerId) return;
+    if (!this.myPlayerId) return;
     const hintData = {
       type: type,
       text: hintText,
       timestamp: Date.now()
     };
 
+    if (this.isLocalMode) {
+      if (!this.localMatch.players[this.myPlayerId].hints) {
+        this.localMatch.players[this.myPlayerId].hints = {};
+      }
+      this.localMatch.players[this.myPlayerId].hints[rank] = hintData;
+      this.localMatch.game.lastAction = {
+        text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
+        type: "hint",
+        timestamp: Date.now()
+      };
+      this.saveLocalMatch(this.localMatch);
+      this.closeGiveHintModal();
+      this.showFloatingNotification(`Hint broadcast for #${rank} pick: "${hintText}"`, "hint");
+
+      if (this.modalMyList?.classList.contains("open")) {
+        this.renderMyListDrawer();
+      }
+      if (this.modalHintsHub?.classList.contains("open")) {
+        this.renderHintsHubSlots();
+      }
+      this.renderBoardSlots(this.localMatch);
+      return;
+    }
+
+    if (!this.currentRoomCode) return;
     const updates = {};
     updates[`players/${this.myPlayerId}/hints/${rank}`] = hintData;
     updates[`game/lastAction`] = {
@@ -2156,6 +2324,11 @@ class GameController {
 
     this.entryErrorBanner.classList.add("hidden");
 
+    if (this.isLocalMode) {
+      this.handleLocalSubmitSecretList(slots);
+      return;
+    }
+
     // Backup locally
     this.backupSecretList();
 
@@ -2353,9 +2526,23 @@ class GameController {
 
     // Active vs Passive Turn Control
 
-    if (isMyTurn) {
+    if (this.isLocalMode) {
       this.activeTurnControl.classList.remove("hidden");
       this.passiveTurnBanner.classList.add("hidden");
+      const activeP = players[activePlayerId];
+      const activeName = activeP ? activeP.name : "Player";
+      if (this.activeTurnControlTitle) {
+        this.activeTurnControlTitle.textContent = `CURRENT TURN: ${activeName.toUpperCase()}`;
+      }
+      this.btnActiveSkipTurn?.classList.remove("hidden");
+      this.renderTargetPlayerSelector(room);
+    } else if (isMyTurn) {
+      this.activeTurnControl.classList.remove("hidden");
+      this.passiveTurnBanner.classList.add("hidden");
+      if (this.activeTurnControlTitle) {
+        this.activeTurnControlTitle.textContent = "YOUR TURN: GUESS AN OPPONENT'S ITEM";
+      }
+      this.btnActiveSkipTurn?.classList.add("hidden");
       this.renderTargetPlayerSelector(room);
     } else {
       this.activeTurnControl.classList.add("hidden");
@@ -2381,6 +2568,10 @@ class GameController {
   // --------------------------------------------------------------------------
 
   async hostSkipTurn() {
+    if (this.isLocalMode) {
+      this.localSkipTurn();
+      return;
+    }
     if (!this.isHost || !this.currentRoomCode || !this.roomData || this.roomData.meta?.status !== "playing") return;
     const game = this.roomData.game || {};
     const turnOrder = game.turnOrder || [];
@@ -2668,6 +2859,11 @@ class GameController {
     // LAYER 3: LIVE TARGET CONFIRMATION POPUP (FALLBACK)
     // No exact auto-match. Prompt target player with live modal.
     // ========================================================================
+    if (this.isLocalMode) {
+      this.showLocalVerifyChoiceModal(guessText, targetPlayerId, this.myPlayerId);
+      return;
+    }
+
     const confirmationData = {
       active: true,
       fromPlayerId: this.myPlayerId,
@@ -2688,6 +2884,11 @@ class GameController {
     const newGuesserPoints = (guesserPlayer.points || 0) + pointsAwarded;
 
     const actionText = `${guesserPlayer.name} guessed '${slot.item}' on ${targetPlayerName}'s list (+${pointsAwarded} pts)`;
+
+    if (this.isLocalMode) {
+      this.applyLocalCorrectGuess(slot, targetPlayerId, targetPlayerName, guesserPlayer);
+      return;
+    }
 
     const updates = {};
     updates[`lists/${targetPlayerId}/${slot.rank}/revealed`] = true;
@@ -3091,6 +3292,13 @@ class GameController {
     const allCompleted = players.every(p => this.isPlayerListCompleted(p.id, lists));
 
     if (allCompleted) {
+      if (this.isLocalMode) {
+        this.localMatch.meta.status = "game_over";
+        this.saveLocalMatch(this.localMatch);
+        this.renderGameOver(this.localMatch);
+        this.switchView("game_over");
+        return;
+      }
       if (this.isHost) {
         db.update(`rooms/${this.currentRoomCode}/meta`, { status: "game_over" });
       }
@@ -3144,9 +3352,14 @@ class GameController {
       this.finalAllListsContainer.appendChild(card);
     });
 
-    // Play Again button (Host only)
-    if (this.isHost) {
+    // Play Again button (Host only in online, always available in Pass & Play)
+    if (this.isLocalMode) {
       this.btnPlayAgain.classList.remove("hidden");
+      this.btnPlayAgain.textContent = "PLAY AGAIN (SAME PLAYERS)";
+      this.playAgainNote.textContent = "Start a fresh match with the same players.";
+    } else if (this.isHost) {
+      this.btnPlayAgain.classList.remove("hidden");
+      this.btnPlayAgain.textContent = "PLAY AGAIN";
       this.playAgainNote.textContent = "You are the Host. Click below to start a new match in this room.";
     } else {
       this.btnPlayAgain.classList.add("hidden");
@@ -3155,6 +3368,10 @@ class GameController {
   }
 
   async handlePlayAgain() {
+    if (this.isLocalMode) {
+      this.restartLocalMatchSamePlayers();
+      return;
+    }
     if (!this.isHost || !this.currentRoomCode) return;
 
     // Reset player scores and submission states, clear lists, return to lobby
@@ -3240,6 +3457,746 @@ class GameController {
 
       this.myListDrawerSlots.appendChild(itemEl);
     }
+  }
+
+  // ==========================================================================
+  // 1-DEVICE (PASS & PLAY) LOCAL MULTIPLAYER ENGINE
+  // ==========================================================================
+
+  switchHomeMode(mode) {
+    if (mode === "local") {
+      this.tabModeLocal?.classList.add("active");
+      this.tabModeOnline?.classList.remove("active");
+      this.panelModeLocal?.classList.remove("hidden");
+      this.panelModeOnline?.classList.add("hidden");
+      this.checkLocalMatchSaved();
+      this.renderLocalPlayerInputs();
+    } else {
+      this.tabModeOnline?.classList.add("active");
+      this.tabModeLocal?.classList.remove("active");
+      this.panelModeOnline?.classList.remove("hidden");
+      this.panelModeLocal?.classList.add("hidden");
+    }
+  }
+
+  adjustLocalPlayerCount(delta) {
+    const nextCount = Math.max(3, Math.min(10, this.localPlayerCount + delta));
+    if (nextCount === this.localPlayerCount) return;
+    this.localPlayerCount = nextCount;
+    if (this.localPlayerCountDisplay) {
+      this.localPlayerCountDisplay.textContent = this.localPlayerCount;
+    }
+    this.renderLocalPlayerInputs();
+  }
+
+  renderLocalPlayerInputs() {
+    if (!this.localPlayerNamesList) return;
+
+    // Collect existing values to avoid wiping typed names
+    const existingValues = [];
+    for (let i = 1; i <= 10; i++) {
+      const inp = document.getElementById(`local-player-name-${i}`);
+      if (inp) {
+        existingValues.push(inp.value);
+      }
+    }
+
+    if (this.btnLocalCountMinus) {
+      this.btnLocalCountMinus.disabled = (this.localPlayerCount <= 3);
+    }
+    if (this.btnLocalCountPlus) {
+      this.btnLocalCountPlus.disabled = (this.localPlayerCount >= 10);
+    }
+
+    this.localPlayerNamesList.innerHTML = "";
+    for (let i = 1; i <= this.localPlayerCount; i++) {
+      const row = document.createElement("div");
+      row.className = "local-name-row";
+
+      const defaultPlaceholder = `Player ${i}`;
+      const savedValue = existingValues[i - 1] !== undefined ? existingValues[i - 1] : "";
+
+      row.innerHTML = `
+        <span class="local-name-badge">PLAYER ${i}</span>
+        <input type="text" class="local-name-input" id="local-player-name-${i}" placeholder="Enter Player ${i} name" maxlength="20" autocomplete="off" value="${this.escapeHtml(savedValue)}">
+      `;
+      this.localPlayerNamesList.appendChild(row);
+    }
+  }
+
+  selectLocalCategory(category) {
+    if (!category) return;
+    this.localCategory = category;
+    this.localCategoryBtns.forEach(btn => {
+      btn.classList.toggle("selected", btn.dataset.category === category);
+    });
+
+    if (this.localCustomCategoryBox) {
+      this.localCustomCategoryBox.classList.toggle("hidden", category !== "custom");
+      if (category === "custom") {
+        this.inputLocalCustomCategoryTitle?.focus();
+      }
+    }
+  }
+
+  checkLocalMatchSaved() {
+    if (!this.localReconnectBox) return;
+    const raw = localStorage.getItem("ta5mena_local_match");
+    if (!raw) {
+      this.localReconnectBox.classList.add("hidden");
+      return;
+    }
+
+    try {
+      const match = JSON.parse(raw);
+      if (match && match.meta && match.players) {
+        const pCount = Object.keys(match.players).length;
+        const catTitle = this.getCategoryTitle(match.meta.category, match.meta.customCategory);
+        const status = (match.meta.status || "active").toUpperCase();
+        if (this.localReconnectInfo) {
+          this.localReconnectInfo.textContent = `${pCount} Players • ${catTitle} (${status})`;
+        }
+        this.localReconnectBox.classList.remove("hidden");
+      } else {
+        this.localReconnectBox.classList.add("hidden");
+      }
+    } catch (e) {
+      this.localReconnectBox.classList.add("hidden");
+    }
+  }
+
+  discardLocalMatch() {
+    localStorage.removeItem("ta5mena_local_match");
+    this.localMatch = null;
+    this.isLocalMode = false;
+    this.localReconnectBox?.classList.add("hidden");
+    this.showAlert("Discarded saved Pass & Play match.");
+  }
+
+  resumeLocalMatch() {
+    const raw = localStorage.getItem("ta5mena_local_match");
+    if (!raw) return;
+
+    try {
+      const match = JSON.parse(raw);
+      if (!match || !match.players || !match.meta) return;
+
+      this.isLocalMode = true;
+      this.localMatch = match;
+      this.roomData = match;
+      this.currentRoomCode = "LOCAL";
+      this.localPlayerIds = Object.keys(match.players);
+      this.category = match.meta.category || "singers";
+
+      if (match.meta.status === "entry") {
+        // Find first player who has not submitted their list
+        const remainingIdx = this.localPlayerIds.findIndex(pid => !match.players[pid].listSubmitted);
+        if (remainingIdx === -1) {
+          this.startLocalGameTurn();
+        } else {
+          this.openLocalPlayerListEntry(remainingIdx);
+        }
+      } else if (match.meta.status === "playing") {
+        this.startLocalGameTurn();
+      } else if (match.meta.status === "game_over") {
+        this.renderGameOver(match);
+        this.switchView("game_over");
+      }
+      this.showAlert("Resumed your Pass & Play match!");
+    } catch (e) {
+      console.warn("Failed to resume local match:", e);
+    }
+  }
+
+  startLocalMatch() {
+    const names = [];
+    for (let i = 1; i <= this.localPlayerCount; i++) {
+      const inp = document.getElementById(`local-player-name-${i}`);
+      const name = (inp?.value || "").trim();
+      names.push(name);
+    }
+
+    // Validation 1: All names filled
+    const hasEmpty = names.some(n => n.length === 0);
+    if (hasEmpty) {
+      if (this.localSetupErrorBanner) {
+        this.localSetupErrorBanner.textContent = `Please enter a name for all ${this.localPlayerCount} players.`;
+        this.localSetupErrorBanner.classList.remove("hidden");
+      }
+      return;
+    }
+
+    // Validation 2: No duplicate names (case-insensitive)
+    const seenNames = new Set();
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      if (seenNames.has(lower)) {
+        if (this.localSetupErrorBanner) {
+          this.localSetupErrorBanner.textContent = `All player names must be unique. Duplicate: "${name}"`;
+          this.localSetupErrorBanner.classList.remove("hidden");
+        }
+        return;
+      }
+      seenNames.add(lower);
+    }
+
+    // Validation 3: Custom topic title if custom category is selected
+    const customTitle = (this.inputLocalCustomCategoryTitle?.value || "").trim();
+    if (this.localCategory === "custom" && !customTitle) {
+      if (this.localSetupErrorBanner) {
+        this.localSetupErrorBanner.textContent = "Please enter a custom topic title before starting.";
+        this.localSetupErrorBanner.classList.remove("hidden");
+      }
+      this.inputLocalCustomCategoryTitle?.focus();
+      return;
+    }
+
+    this.localSetupErrorBanner?.classList.add("hidden");
+
+    // Build player nodes
+    const players = {};
+    const pids = [];
+    names.forEach((name, idx) => {
+      const pid = `lp_${idx + 1}_${Date.now().toString(36).slice(-4)}`;
+      pids.push(pid);
+      players[pid] = {
+        id: pid,
+        name: name,
+        points: 0,
+        listSubmitted: false,
+        targetCompleted: false,
+        missedGuesses: [],
+        hints: {}
+      };
+    });
+
+    const match = {
+      meta: {
+        code: "LOCAL",
+        mode: "local",
+        category: this.localCategory,
+        customCategory: this.localCategory === "custom" ? customTitle : "",
+        status: "entry",
+        createdAt: Date.now()
+      },
+      players: players,
+      lists: {},
+      finishedOrder: [],
+      game: {
+        turnOrder: [],
+        currentTurnIndex: 0,
+        activePlayerId: null,
+        round: 1,
+        lastAction: null,
+        confirmation: null
+      }
+    };
+
+    this.isLocalMode = true;
+    this.localMatch = match;
+    this.roomData = match;
+    this.currentRoomCode = "LOCAL";
+    this.localPlayerIds = pids;
+    this.localCurrentEntryIndex = 0;
+    this.category = this.localCategory;
+    this.saveLocalMatch(match);
+
+    this.openLocalPlayerListEntry(0);
+  }
+
+  saveLocalMatch(match) {
+    this.localMatch = match;
+    this.roomData = match;
+    try {
+      localStorage.setItem("ta5mena_local_match", JSON.stringify(match));
+    } catch (e) {
+      console.warn("Error saving local match:", e);
+    }
+  }
+
+  showPrivacyCurtain(playerName, actionTitle, onProceed) {
+    if (!this.modalPrivacyCurtain) return;
+    if (this.privacyCurtainPlayerName) {
+      this.privacyCurtainPlayerName.textContent = playerName.toUpperCase();
+    }
+    if (this.privacyCurtainActionName) {
+      this.privacyCurtainActionName.textContent = actionTitle;
+    }
+    this.localCurtainProceedCallback = onProceed;
+    this.modalPrivacyCurtain.classList.add("open");
+  }
+
+  closePrivacyCurtain() {
+    this.modalPrivacyCurtain?.classList.remove("open");
+  }
+
+  handlePrivacyCurtainProceed() {
+    const cb = this.localCurtainProceedCallback;
+    this.localCurtainProceedCallback = null;
+    this.closePrivacyCurtain();
+    if (cb) cb();
+  }
+
+  openLocalPlayerListEntry(playerIndex) {
+    if (playerIndex >= this.localPlayerIds.length) {
+      // All players locked in
+      this.finishAllLocalLists();
+      return;
+    }
+
+    this.localCurrentEntryIndex = playerIndex;
+    const pid = this.localPlayerIds[playerIndex];
+    const player = this.localMatch.players[pid];
+
+    // Wipe any leftover text from inputs immediately before showing privacy curtain
+    for (let r = 1; r <= 10; r++) {
+      const input = document.getElementById(`entry-slot-input-${r}`);
+      if (input) input.value = "";
+      const dd = document.getElementById(`autocomplete-slot-${r}`);
+      if (dd) { dd.innerHTML = ""; dd.classList.remove("open"); }
+    }
+
+    this.showPrivacyCurtain(
+      player.name,
+      `ENTER MY LIST`,
+      () => {
+        this.myPlayerId = pid;
+        this.myPlayerName = player.name;
+        this.category = this.localMatch.meta.category;
+
+        this.switchView("entry");
+        const catTitle = this.getCategoryTitle(this.localMatch.meta.category, this.localMatch.meta.customCategory);
+        if (this.entryCategoryTitle) {
+          this.entryCategoryTitle.textContent = `${player.name}'s Top 10: ${catTitle}`;
+        }
+
+        if (this.entrySlotsContainer.children.length === 0) {
+          this.buildEntrySlots();
+        }
+
+        // Restore if player already saved draft
+        const existingList = this.localMatch.lists[pid];
+        for (let r = 1; r <= 10; r++) {
+          const input = document.getElementById(`entry-slot-input-${r}`);
+          if (input) {
+            input.disabled = false;
+            input.value = (existingList && existingList[r]) ? existingList[r].item : "";
+          }
+        }
+
+        if (this.restoreBanner) this.restoreBanner.classList.add("hidden");
+        if (this.entryWaitingCard) this.entryWaitingCard.classList.add("hidden");
+
+        this.btnSubmitList.disabled = false;
+        this.btnSubmitList.innerHTML = `
+          <svg class="icon" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          LOCK IN LIST & PASS PHONE
+        `;
+      }
+    );
+  }
+
+  handleLocalSubmitSecretList(slots) {
+    this.localMatch.lists[this.myPlayerId] = slots;
+    this.localMatch.players[this.myPlayerId].listSubmitted = true;
+
+    // Immediately wipe inputs from screen to prevent next player from seeing
+    for (let r = 1; r <= 10; r++) {
+      const input = document.getElementById(`entry-slot-input-${r}`);
+      if (input) input.value = "";
+      const dd = document.getElementById(`autocomplete-slot-${r}`);
+      if (dd) { dd.innerHTML = ""; dd.classList.remove("open"); }
+    }
+
+    this.saveLocalMatch(this.localMatch);
+
+    const nextIndex = this.localCurrentEntryIndex + 1;
+    if (nextIndex < this.localPlayerIds.length) {
+      this.openLocalPlayerListEntry(nextIndex);
+    } else {
+      this.finishAllLocalLists();
+    }
+  }
+
+  finishAllLocalLists() {
+    // Randomize turn order
+    const pids = [...this.localPlayerIds];
+    for (let i = pids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pids[i], pids[j]] = [pids[j], pids[i]];
+    }
+
+    this.localMatch.meta.status = "playing";
+    this.localMatch.game.turnOrder = pids;
+    this.localMatch.game.currentTurnIndex = 0;
+    this.localMatch.game.activePlayerId = pids[0];
+    this.localMatch.game.round = 1;
+    this.localMatch.game.lastAction = {
+      text: `Pass & Play match started! ${this.localMatch.players[pids[0]].name}'s turn to guess.`,
+      timestamp: Date.now()
+    };
+    this.saveLocalMatch(this.localMatch);
+    this.showFloatingNotification("All lists locked in! Turns randomized.", "milestone");
+    this.startLocalGameTurn();
+  }
+
+  startLocalGameTurn() {
+    const game = this.localMatch.game;
+    const turnOrder = game.turnOrder || this.localPlayerIds;
+    const activePlayerId = game.activePlayerId || turnOrder[game.currentTurnIndex || 0];
+    const activePlayer = this.localMatch.players[activePlayerId];
+
+    this.myPlayerId = activePlayerId;
+    this.myPlayerName = activePlayer ? activePlayer.name : "Player";
+    this.selectedTargetPlayerId = null;
+    this.viewingPlayerId = null;
+    this.isViewingMySecretList = false;
+
+    // Reset guess input
+    if (this.inputTurnGuess) {
+      this.inputTurnGuess.value = "";
+    }
+    if (this.btnSubmitGuess) {
+      this.btnSubmitGuess.disabled = true;
+    }
+
+    this.switchView("game");
+    this.renderMainGame(this.localMatch);
+    this.updateMyListButtonVisibility(this.localMatch);
+  }
+
+  applyLocalCorrectGuess(slot, targetPlayerId, targetPlayerName, guesserPlayer) {
+    const pointsAwarded = slot.points;
+    const newGuesserPoints = (guesserPlayer.points || 0) + pointsAwarded;
+
+    slot.revealed = true;
+    slot.guessedBy = guesserPlayer.name;
+    guesserPlayer.points = newGuesserPoints;
+
+    const actionText = `${guesserPlayer.name} guessed '${slot.item}' on ${targetPlayerName}'s list (+${pointsAwarded} pts)`;
+
+    // Check target list completion
+    const targetList = this.localMatch.lists[targetPlayerId] || {};
+    let allRevealed = true;
+    for (let r = 1; r <= 10; r++) {
+      if (!targetList[r] || !targetList[r].revealed) {
+        allRevealed = false;
+        break;
+      }
+    }
+
+    let milestoneAnnouncement = null;
+    if (allRevealed) {
+      if (!this.localMatch.finishedOrder) this.localMatch.finishedOrder = [];
+      if (!this.localMatch.finishedOrder.includes(targetPlayerId)) {
+        this.localMatch.finishedOrder.push(targetPlayerId);
+        const placeNum = this.localMatch.finishedOrder.length;
+        const placeText = this.getOrdinalPlace(placeNum);
+        milestoneAnnouncement = `${targetPlayerName}'s list is 100% complete (${placeText})! The game continues until everyone finishes!`;
+      }
+    }
+
+    this.localMatch.game.lastAction = {
+      text: milestoneAnnouncement || actionText,
+      type: milestoneAnnouncement ? "milestone" : "success",
+      timestamp: Date.now()
+    };
+
+    this.saveLocalMatch(this.localMatch);
+    this.showFloatingNotification(milestoneAnnouncement || actionText, milestoneAnnouncement ? "milestone" : "success");
+
+    // Check if entire match is finished
+    const allLists = this.localMatch.lists || {};
+    const allPlayersDone = Object.keys(this.localMatch.players).every(pid => {
+      const pList = allLists[pid] || {};
+      for (let r = 1; r <= 10; r++) {
+        if (!pList[r] || !pList[r].revealed) return false;
+      }
+      return true;
+    });
+
+    if (allPlayersDone) {
+      this.localMatch.meta.status = "game_over";
+      this.saveLocalMatch(this.localMatch);
+      this.renderGameOver(this.localMatch);
+      this.switchView("game_over");
+      return;
+    }
+
+    this.advanceLocalTurn();
+  }
+
+  advanceLocalTurn() {
+    const game = this.localMatch.game;
+    const turnOrder = game.turnOrder || this.localPlayerIds;
+    let nextIndex = (game.currentTurnIndex + 1) % turnOrder.length;
+    let nextRound = game.round || 1;
+
+    if (nextIndex === 0) {
+      nextRound += 1;
+    }
+
+    let attempts = 0;
+    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.localMatch)) {
+      nextIndex = (nextIndex + 1) % turnOrder.length;
+      if (nextIndex === 0) nextRound += 1;
+      attempts++;
+    }
+
+    const nextActivePlayerId = turnOrder[nextIndex];
+    game.currentTurnIndex = nextIndex;
+    game.activePlayerId = nextActivePlayerId;
+    game.round = nextRound;
+    game.confirmation = null;
+
+    this.saveLocalMatch(this.localMatch);
+    this.startLocalGameTurn();
+  }
+
+  localSkipTurn() {
+    const game = this.localMatch.game;
+    const activePlayer = this.localMatch.players[game.activePlayerId];
+    const activeName = activePlayer ? activePlayer.name : "Player";
+
+    this.localMatch.game.lastAction = {
+      text: `${activeName}'s turn was skipped.`,
+      type: "skip",
+      timestamp: Date.now()
+    };
+    this.showFloatingNotification(`${activeName}'s turn was skipped.`, "skip");
+    this.advanceLocalTurn();
+  }
+
+  showLocalVerifyChoiceModal(guessText, targetPlayerId, guesserPlayerId) {
+    this.localPendingVerify = { guessText, targetPlayerId, guesserPlayerId };
+    const targetPlayer = this.localMatch.players[targetPlayerId];
+    const guesserPlayer = this.localMatch.players[guesserPlayerId];
+    const targetList = this.localMatch.lists[targetPlayerId] || {};
+
+    if (this.localVerifyChoiceGuessText) {
+      this.localVerifyChoiceGuessText.textContent = `"${guessText}"`;
+    }
+    if (this.localVerifyChoiceGuesserName) {
+      this.localVerifyChoiceGuesserName.textContent = guesserPlayer ? guesserPlayer.name : "Guesser";
+    }
+    if (this.localVerifyChoiceTargetName) {
+      this.localVerifyChoiceTargetName.textContent = targetPlayer ? targetPlayer.name : "Target";
+    }
+    if (this.localVerifyChoiceTargetBadge) {
+      this.localVerifyChoiceTargetBadge.textContent = `TARGET: ${targetPlayer ? targetPlayer.name.toUpperCase() : 'TARGET'}`;
+    }
+    if (this.localVerifySecretTargetBtnLabel) {
+      this.localVerifySecretTargetBtnLabel.textContent = targetPlayer ? targetPlayer.name.toUpperCase() : "TARGET";
+    }
+
+    // Populate Option A oral rank buttons (#1 to #10)
+    if (this.localVerifyOralRanksContainer) {
+      this.localVerifyOralRanksContainer.innerHTML = "";
+      for (let r = 1; r <= 10; r++) {
+        const slot = targetList[r];
+        const isRevealed = slot && slot.revealed;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-rank-check";
+        btn.disabled = !!isRevealed;
+        btn.innerHTML = `#${r}<div style="font-size: 10px; opacity: 0.85;">${r}pt</div>`;
+
+        if (!isRevealed) {
+          btn.addEventListener("click", () => this.handleLocalOralRankCheck(r));
+        }
+        this.localVerifyOralRanksContainer.appendChild(btn);
+      }
+    }
+
+    this.modalLocalVerifyChoice?.classList.add("open");
+  }
+
+  closeLocalVerifyChoiceModal() {
+    this.modalLocalVerifyChoice?.classList.remove("open");
+  }
+
+  handleLocalOralRankCheck(rank) {
+    if (!this.localPendingVerify) return;
+    const { targetPlayerId, guesserPlayerId } = this.localPendingVerify;
+    const targetPlayer = this.localMatch.players[targetPlayerId];
+    const guesserPlayer = this.localMatch.players[guesserPlayerId];
+    const targetList = this.localMatch.lists[targetPlayerId] || {};
+    const slot = targetList[rank];
+
+    this.closeLocalVerifyChoiceModal();
+    if (slot && !slot.revealed) {
+      this.applyLocalCorrectGuess(slot, targetPlayerId, targetPlayer.name, guesserPlayer);
+    }
+    this.localPendingVerify = null;
+  }
+
+  handleLocalVerifyWrong() {
+    if (!this.localPendingVerify) return;
+    const { guessText, targetPlayerId, guesserPlayerId } = this.localPendingVerify;
+    const targetPlayer = this.localMatch.players[targetPlayerId];
+    const guesserPlayer = this.localMatch.players[guesserPlayerId];
+
+    if (targetPlayer) {
+      if (!targetPlayer.missedGuesses) targetPlayer.missedGuesses = [];
+      targetPlayer.missedGuesses.push(guessText);
+    }
+
+    this.closeLocalVerifyChoiceModal();
+    this.closeLocalSecretTargetSlotsModal();
+
+    const actionText = `${guesserPlayer ? guesserPlayer.name : 'Player'} missed on ${targetPlayer ? targetPlayer.name : 'Target'}'s list.`;
+    this.localMatch.game.lastAction = {
+      text: actionText,
+      type: "danger",
+      timestamp: Date.now()
+    };
+    this.saveLocalMatch(this.localMatch);
+    this.showFloatingNotification(actionText, "danger");
+
+    this.localPendingVerify = null;
+    this.advanceLocalTurn();
+  }
+
+  openLocalSecretVerifyForTarget() {
+    if (!this.localPendingVerify) return;
+    const { guessText, targetPlayerId, guesserPlayerId } = this.localPendingVerify;
+    const targetPlayer = this.localMatch.players[targetPlayerId];
+    const guesserPlayer = this.localMatch.players[guesserPlayerId];
+    const targetList = this.localMatch.lists[targetPlayerId] || {};
+
+    this.closeLocalVerifyChoiceModal();
+
+    // Show Privacy Curtain for target player
+    this.showPrivacyCurtain(
+      targetPlayer.name,
+      `CHECK MY LIST`,
+      () => {
+        if (this.localSecretSlotsPlayerName) {
+          this.localSecretSlotsPlayerName.textContent = `${targetPlayer.name}'s Secret List`;
+        }
+        if (this.localSecretSlotsGuessText) {
+          this.localSecretSlotsGuessText.textContent = `"${guessText}"`;
+        }
+
+        // Render target's unguessed slots
+        if (this.localSecretSlotsList) {
+          this.localSecretSlotsList.innerHTML = "";
+          for (let r = 1; r <= 10; r++) {
+            const slot = targetList[r];
+            if (!slot || slot.revealed) continue;
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "secret-target-slot-btn";
+            btn.innerHTML = `
+              <span class="secret-target-slot-rank">#${r} (${r} ${r === 1 ? 'pt' : 'pts'})</span>
+              <span class="secret-target-slot-item">${this.escapeHtml(slot.item)}</span>
+            `;
+            btn.addEventListener("click", () => {
+              this.closeLocalSecretTargetSlotsModal();
+              this.applyLocalCorrectGuess(slot, targetPlayerId, targetPlayer.name, guesserPlayer);
+              this.localPendingVerify = null;
+            });
+            this.localSecretSlotsList.appendChild(btn);
+          }
+        }
+
+        this.modalLocalSecretTargetSlots?.classList.add("open");
+      }
+    );
+  }
+
+  closeLocalSecretTargetSlotsModal() {
+    this.modalLocalSecretTargetSlots?.classList.remove("open");
+  }
+
+  showLocalRevealConfirm(title, message, onConfirm) {
+    if (this.localRevealConfirmTitle) {
+      this.localRevealConfirmTitle.textContent = title;
+    }
+    if (this.localRevealConfirmMessage) {
+      this.localRevealConfirmMessage.textContent = message;
+    }
+    this.localRevealConfirmCallback = onConfirm;
+    this.modalLocalRevealConfirm?.classList.add("open");
+  }
+
+  closeLocalRevealConfirm() {
+    this.modalLocalRevealConfirm?.classList.remove("open");
+    this.localRevealConfirmCallback = null;
+  }
+
+  confirmLocalReveal() {
+    const cb = this.localRevealConfirmCallback;
+    this.closeLocalRevealConfirm();
+    if (cb) cb();
+  }
+
+  handleLocalLeave() {
+    this.showConfirmModal({
+      title: "END PASS & PLAY",
+      message: "End this Pass & Play match and return to the Home Screen?",
+      confirmText: "END MATCH",
+      confirmClass: "btn-danger",
+      onConfirm: () => this.executeLeaveLocalMatch()
+    });
+  }
+
+  executeLeaveLocalMatch() {
+    localStorage.removeItem("ta5mena_local_match");
+    this.isLocalMode = false;
+    this.localMatch = null;
+    this.roomData = null;
+    this.currentRoomCode = null;
+    this.myPlayerId = null;
+    this.myPlayerName = "";
+    this.selectedTargetPlayerId = null;
+    this.viewingPlayerId = null;
+    this.isViewingMySecretList = false;
+
+    this.btnHeaderHints?.classList.add("hidden");
+    this.btnHeaderMyList?.classList.add("hidden");
+    this.btnHeaderLeave?.classList.add("hidden");
+    this.headerRoomTag?.classList.add("hidden");
+
+    this.modalMyList?.classList.remove("open");
+    if (this.modalHintsHub) this.modalHintsHub.classList.remove("open");
+    if (this.modalPrivacyCurtain) this.modalPrivacyCurtain.classList.remove("open");
+    if (this.modalLocalRevealConfirm) this.modalLocalRevealConfirm.classList.remove("open");
+    if (this.modalLocalVerifyChoice) this.modalLocalVerifyChoice.classList.remove("open");
+    if (this.modalLocalSecretTargetSlots) this.modalLocalSecretTargetSlots.classList.remove("open");
+
+    this.switchView("home");
+    this.checkLocalMatchSaved();
+  }
+
+  restartLocalMatchSamePlayers() {
+    if (!this.localMatch || !this.localMatch.players) return;
+
+    // Reset scores, lists, hints, milestones
+    const players = this.localMatch.players;
+    Object.keys(players).forEach(pid => {
+      players[pid].points = 0;
+      players[pid].listSubmitted = false;
+      players[pid].targetCompleted = false;
+      players[pid].missedGuesses = [];
+      players[pid].hints = {};
+    });
+
+    this.localMatch.meta.status = "entry";
+    this.localMatch.lists = {};
+    this.localMatch.finishedOrder = [];
+    this.localMatch.game = {
+      turnOrder: [],
+      currentTurnIndex: 0,
+      activePlayerId: null,
+      round: 1,
+      lastAction: null,
+      confirmation: null
+    };
+
+    this.saveLocalMatch(this.localMatch);
+    this.openLocalPlayerListEntry(0);
   }
 
   // ==========================================================================
