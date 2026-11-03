@@ -315,11 +315,18 @@ class GameController {
     // Header & Alert
     this.headerRoomTag = document.getElementById("header-room-tag");
     this.headerRoomCode = document.getElementById("header-room-code");
+    this.btnHeaderHints = document.getElementById("btn-header-hints");
     this.btnHeaderMyList = document.getElementById("btn-header-my-list");
     this.btnHeaderLeave = document.getElementById("btn-header-leave");
     this.systemAlertBanner = document.getElementById("system-alert-banner");
     this.systemAlertText = document.getElementById("system-alert-text");
     this.btnCloseAlert = document.getElementById("btn-close-alert");
+
+    // Hints Hub Modal
+    this.modalHintsHub = document.getElementById("modal-hints-hub");
+    this.hintsHubSlotsList = document.getElementById("hints-hub-slots-list");
+    this.btnCloseHintsHub = document.getElementById("btn-close-hints-hub");
+    this.btnDismissHintsHub = document.getElementById("btn-dismiss-hints-hub");
 
     // Reusable Sharp Confirmation Modal
     this.modalConfirm = document.getElementById("modal-confirm");
@@ -497,6 +504,16 @@ class GameController {
       }
     });
 
+    // Hints Hub Header Button & Modal Toggle
+    this.btnHeaderHints?.addEventListener("click", () => this.openHintsHubModal());
+    this.btnCloseHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
+    this.btnDismissHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
+    this.modalHintsHub?.addEventListener("click", (e) => {
+      if (e.target === this.modalHintsHub) {
+        this.closeHintsHubModal();
+      }
+    });
+
     // My List Drawer Toggle
     this.btnHeaderMyList.addEventListener("click", () => this.toggleMyListDrawer());
     this.btnCloseMyList.addEventListener("click", () => this.toggleMyListDrawer(false));
@@ -635,10 +652,14 @@ class GameController {
     if (viewName === "home" || !this.currentRoomCode) {
       this.headerRoomTag.classList.add("hidden");
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.add("hidden");
+      if (this.btnHeaderHints) this.btnHeaderHints.classList.add("hidden");
     } else {
       this.headerRoomTag.classList.remove("hidden");
       this.headerRoomCode.textContent = this.currentRoomCode;
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.remove("hidden");
+      if (this.btnHeaderHints) {
+        this.btnHeaderHints.classList.toggle("hidden", viewName !== "game");
+      }
     }
   }
 
@@ -1067,13 +1088,16 @@ class GameController {
     } catch (e) {}
 
     // 4. Clean up UI elements & switch to Home Screen instantly
+    this.btnHeaderHints?.classList.add("hidden");
     this.btnHeaderMyList?.classList.add("hidden");
     this.btnHeaderLeave?.classList.add("hidden");
     this.modalMyList?.classList.remove("open");
+    if (this.modalHintsHub) this.modalHintsHub.classList.remove("open");
     if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
     if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
     this.hidePauseOverlay();
     this.closeGiveHintModal();
+    this.closeHintsHubModal();
     this.closeConfirmModal();
     this.switchView("home");
 
@@ -1296,9 +1320,9 @@ class GameController {
           const hintKey = `${pid}_${slotRank}_${hint.timestamp || ''}_${hint.text || ''}`;
           if (!this.seenHints.has(hintKey)) {
             this.seenHints.add(hintKey);
-            // If dropped by an opponent, show toast: "[Player Name] gave a hint for their #4 pick: Starts with 'A'!"
+            // Prominent live toast: "[Player Name] dropped a hint for their #N pick: [Hint Text]"
             if (pid !== this.myPlayerId && (!hint.timestamp || hint.timestamp > (this.connectedTimestamp - 5000))) {
-              this.showAlert(`${p.name} gave a hint for their #${slotRank} pick: ${hint.text}!`);
+              this.showAlert(`${p.name} dropped a hint for their #${slotRank} pick: ${hint.text}`);
             }
           }
         });
@@ -1306,30 +1330,137 @@ class GameController {
     });
   }
 
-  openGiveHintModal(rank, item) {
-    this.activeHintTargetSlot = { rank, item };
-    this.hintModalSlotTitle.textContent = `Give Hint for Slot #${rank} ("${item}")`;
-    this.customHintError.classList.add("hidden");
-    this.inputCustomHint.value = "";
+  openHintsHubModal() {
+    if (!this.roomData || !this.roomData.lists || !this.myPlayerId) {
+      this.showAlert("Waiting for game list data...");
+      return;
+    }
+    this.renderHintsHubSlots();
+    if (this.modalHintsHub) {
+      this.modalHintsHub.classList.add("open");
+    }
+  }
 
-    // Option 1 preview: First letter
+  closeHintsHubModal() {
+    if (this.modalHintsHub) {
+      this.modalHintsHub.classList.remove("open");
+    }
+  }
+
+  renderHintsHubSlots() {
+    if (!this.roomData || !this.roomData.lists || !this.myPlayerId) return;
+    const myList = this.roomData.lists[this.myPlayerId] || {};
+    const myHints = this.roomData.players?.[this.myPlayerId]?.hints || {};
+
+    if (!this.hintsHubSlotsList) return;
+    this.hintsHubSlotsList.innerHTML = "";
+
+    const bulbSvg = `<svg class="icon icon-bulb" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 2px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"/></svg>`;
+
+    for (let r = 1; r <= 10; r++) {
+      const slot = myList[r] || { item: "", revealed: false, points: r };
+      const hint = myHints[r];
+      const card = document.createElement("div");
+      card.className = "hints-hub-slot-card" + (slot.revealed ? " is-revealed" : "");
+
+      if (slot.revealed) {
+        card.innerHTML = `
+          <div class="hints-hub-slot-header">
+            <div>
+              <strong class="text-accent" style="font-family: var(--font-mono); font-size: 13px;">#${r}</strong>
+              <span style="font-weight: 700; margin-left: 6px; font-size: 13px;">${this.escapeHtml(slot.item || "Unknown")}</span>
+            </div>
+            <span class="badge badge-success">GUESSED / REVEALED (+${slot.points || r} PTS)</span>
+          </div>
+          <div class="text-secondary" style="font-size: 11px;">Already revealed by ${this.escapeHtml(slot.guessedBy || "an opponent")}. No clues needed.</div>
+        `;
+      } else {
+        const activeHintBadge = hint
+          ? `<span class="board-slot-hint-bright">${bulbSvg} 💡 HINT: ${this.escapeHtml(hint.text)}</span>`
+          : `<span class="mono text-secondary" style="font-size: 11px;">NO HINT DROPPED</span>`;
+
+        card.innerHTML = `
+          <div class="hints-hub-slot-header">
+            <div>
+              <strong class="text-accent" style="font-family: var(--font-mono); font-size: 13px;">#${r}</strong>
+              <span style="font-weight: 700; margin-left: 6px; font-size: 13px;">${this.escapeHtml(slot.item || "Secret Pick")}</span>
+              <span class="mono text-secondary" style="font-size: 11px; margin-left: 6px;">(${r} pts)</span>
+            </div>
+            <div id="hints-hub-slot-status-${r}">${activeHintBadge}</div>
+          </div>
+          <div class="hints-hub-actions-row">
+            <button type="button" class="btn btn-hint-quick btn-hh-first-letter" data-rank="${r}">[ 1st Letter ]</button>
+            <button type="button" class="btn btn-hint-quick btn-hh-length" data-rank="${r}">[ Length ]</button>
+            <div class="hints-hub-custom-wrap">
+              <input type="text" class="input-hints-hub-custom" placeholder="Custom clue (max 35 chars)..." maxlength="35" data-rank="${r}">
+              <button type="button" class="btn btn-primary btn-hints-hub-send" data-rank="${r}">Send</button>
+            </div>
+          </div>
+        `;
+
+        const btnFirstLetter = card.querySelector(".btn-hh-first-letter");
+        btnFirstLetter?.addEventListener("click", () => this.handleHintsHubFirstLetter(r, slot.item));
+
+        const btnLength = card.querySelector(".btn-hh-length");
+        btnLength?.addEventListener("click", () => this.handleHintsHubLength(r, slot.item));
+
+        const inputCustom = card.querySelector(`.input-hints-hub-custom[data-rank="${r}"]`);
+        const btnSend = card.querySelector(`.btn-hints-hub-send[data-rank="${r}"]`);
+        const sendCustom = () => this.handleHintsHubCustom(r, slot.item, inputCustom?.value);
+
+        btnSend?.addEventListener("click", sendCustom);
+        inputCustom?.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            sendCustom();
+          }
+        });
+      }
+
+      this.hintsHubSlotsList.appendChild(card);
+    }
+  }
+
+  async handleHintsHubFirstLetter(rank, item) {
     const cleanItem = (item || "").trim().replace(/^["']/, "");
-    const firstChar = cleanItem.charAt(0);
-    const firstLetterHint = `Starts with '${firstChar.toUpperCase()}'`;
-    this.hintFirstLetterPreview.textContent = firstLetterHint;
+    if (!cleanItem) return;
+    const firstChar = cleanItem.charAt(0).toUpperCase();
+    const hintText = `Starts with '${firstChar}'`;
+    await this.broadcastHint(rank, "first_letter", hintText);
+  }
 
-    // Option 2 preview: Word count & letter count: "X word(s), Y letters"
+  async handleHintsHubLength(rank, item) {
+    const cleanItem = (item || "").trim().replace(/^["']/, "");
+    if (!cleanItem) return;
     const words = cleanItem.split(/\s+/).filter(w => w.length > 0);
     const totalLetters = cleanItem.replace(/\s+/g, "").length;
     const wordText = words.length === 1 ? "1 word" : `${words.length} words`;
     const letterText = totalLetters === 1 ? "1 letter" : `${totalLetters} letters`;
-    const wordCountText = `${wordText}, ${letterText}`;
-    this.hintWordCountPreview.textContent = wordCountText;
+    const hintText = `${wordText}, ${letterText}`;
+    await this.broadcastHint(rank, "length", hintText);
+  }
 
-    this.modalGiveHint.classList.add("open");
+  async handleHintsHubCustom(rank, item, rawCustom) {
+    const customVal = (rawCustom || "").trim().slice(0, 35);
+    if (!customVal) {
+      this.showAlert("Please enter a clue (max 35 chars).");
+      return;
+    }
+    const normCustom = normalizeText(customVal);
+    const normItem = normalizeText(item);
+    if (normCustom === normItem || (normItem.length > 3 && normCustom.includes(normItem))) {
+      this.showAlert("Hint cannot contain the exact secret answer!");
+      return;
+    }
+    await this.broadcastHint(rank, "custom", customVal);
+  }
+
+  openGiveHintModal(rank, item) {
+    this.openHintsHubModal();
   }
 
   closeGiveHintModal() {
+    this.closeHintsHubModal();
     this.activeHintTargetSlot = null;
     if (this.modalGiveHint) {
       this.modalGiveHint.classList.remove("open");
@@ -1339,44 +1470,20 @@ class GameController {
   async submitFirstLetterHint() {
     if (!this.activeHintTargetSlot) return;
     const { rank, item } = this.activeHintTargetSlot;
-    const cleanItem = (item || "").trim().replace(/^["']/, "");
-    const firstChar = cleanItem.charAt(0);
-    const hintText = `Starts with '${firstChar.toUpperCase()}'`;
-    await this.broadcastHint(rank, "first_letter", hintText);
+    await this.handleHintsHubFirstLetter(rank, item);
   }
 
   async submitWordCountHint() {
     if (!this.activeHintTargetSlot) return;
     const { rank, item } = this.activeHintTargetSlot;
-    const cleanItem = (item || "").trim().replace(/^["']/, "");
-    const words = cleanItem.split(/\s+/).filter(w => w.length > 0);
-    const totalLetters = cleanItem.replace(/\s+/g, "").length;
-    const wordText = words.length === 1 ? "1 word" : `${words.length} words`;
-    const letterText = totalLetters === 1 ? "1 letter" : `${totalLetters} letters`;
-    const hintText = `${wordText}, ${letterText}`;
-    await this.broadcastHint(rank, "word_count", hintText);
+    await this.handleHintsHubLength(rank, item);
   }
 
   async submitCustomHint() {
     if (!this.activeHintTargetSlot) return;
     const { rank, item } = this.activeHintTargetSlot;
-    const customVal = this.inputCustomHint.value.trim().slice(0, 30);
-
-    if (!customVal) {
-      this.customHintError.textContent = "Please enter a short clue.";
-      this.customHintError.classList.remove("hidden");
-      return;
-    }
-
-    const normCustom = normalizeText(customVal);
-    const normItem = normalizeText(item);
-    if (normCustom === normItem || (normItem.length > 3 && normCustom.includes(normItem))) {
-      this.customHintError.textContent = "Hint cannot contain the exact secret answer!";
-      this.customHintError.classList.remove("hidden");
-      return;
-    }
-
-    await this.broadcastHint(rank, "custom", customVal);
+    const customVal = this.inputCustomHint.value.trim().slice(0, 35);
+    await this.handleHintsHubCustom(rank, item, customVal);
   }
 
   async broadcastHint(rank, type, hintText) {
@@ -1390,7 +1497,7 @@ class GameController {
     const updates = {};
     updates[`players/${this.myPlayerId}/hints/${rank}`] = hintData;
     updates[`game/lastAction`] = {
-      text: `${this.myPlayerName} gave a hint for their #${rank} pick: ${hintText}!`,
+      text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
       timestamp: Date.now()
     };
     updates["lastActivity"] = Date.now();
@@ -1399,25 +1506,35 @@ class GameController {
     this.closeGiveHintModal();
     this.showAlert(`Hint broadcast for #${rank} pick: "${hintText}"`);
 
-    if (this.modalMyList.classList.contains("open")) {
+    if (this.modalMyList?.classList.contains("open")) {
       this.renderMyListDrawer();
+    }
+    if (this.modalHintsHub?.classList.contains("open")) {
+      this.renderHintsHubSlots();
     }
   }
 
   updateMyListButtonVisibility(room) {
     if (!room || !this.myPlayerId) {
-      this.btnHeaderMyList.classList.add("hidden");
+      this.btnHeaderMyList?.classList.add("hidden");
+      this.btnHeaderHints?.classList.add("hidden");
       return;
     }
     const me = room.players ? room.players[this.myPlayerId] : null;
     const isEntryLocked = (room.meta?.status === "entry" && me && me.listSubmitted);
     const isPlaying = (room.meta?.status === "playing");
     const show = !!(isEntryLocked || isPlaying);
-    this.btnHeaderMyList.classList.toggle("hidden", !show);
+    this.btnHeaderMyList?.classList.toggle("hidden", !show);
+    
+    // Lightbulb HINTS button is ALWAYS visible to every player during all rounds of the active game (whether their turn or not)
+    this.btnHeaderHints?.classList.toggle("hidden", !isPlaying);
 
     // If modal is currently open, live update its slots
-    if (this.modalMyList.classList.contains("open")) {
+    if (this.modalMyList?.classList.contains("open")) {
       this.renderMyListDrawer();
+    }
+    if (this.modalHintsHub?.classList.contains("open")) {
+      this.renderHintsHubSlots();
     }
   }
 
@@ -2685,7 +2802,7 @@ class GameController {
 
         const btn = itemEl.querySelector(".btn-board-hint");
         if (btn) {
-          btn.addEventListener("click", () => this.openGiveHintModal(r, slot.item));
+          btn.addEventListener("click", () => this.openHintsHubModal());
         }
       } else {
         // Opponent's list
@@ -2702,8 +2819,9 @@ class GameController {
         } else {
           itemEl.className = "board-slot-item locked";
           const hint = targetHints[r];
+          const bulbSvg = `<svg class="icon icon-bulb" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 2px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"/></svg>`;
           const hintBadge = hint
-            ? `<span class="board-slot-hint-bright">• HINT: ${this.escapeHtml(hint.text)}</span>`
+            ? `<span class="board-slot-hint-bright">${bulbSvg} 💡 HINT: ${this.escapeHtml(hint.text)}</span>`
             : '';
 
           itemEl.innerHTML = `
@@ -2915,7 +3033,7 @@ class GameController {
 
       const btn = itemEl.querySelector(".btn-drawer-hint");
       if (btn) {
-        btn.addEventListener("click", () => this.openGiveHintModal(r, slot.item));
+        btn.addEventListener("click", () => this.openHintsHubModal());
       }
 
       this.myListDrawerSlots.appendChild(itemEl);

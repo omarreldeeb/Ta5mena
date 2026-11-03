@@ -24,6 +24,14 @@
           <span>ROOM</span>
           <strong id="header-room-code">----</strong>
         </div>
+        <button id="btn-header-hints" type="button" class="btn btn-sm btn-hints hidden" title="Hints Hub">
+          <svg class="icon icon-bulb" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18h6"></path>
+            <path d="M10 22h4"></path>
+            <path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"></path>
+          </svg>
+          <span>HINTS</span>
+        </button>
         <button id="btn-header-my-list" type="button" class="btn btn-sm btn-my-list hidden">
           MY LIST
         </button>
@@ -548,6 +556,43 @@
             </div>
             <div id="custom-hint-error" class="hidden" style="color: var(--danger); font-size: 11px; margin-top: 6px;"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: HINTS HUB MODAL (10 SLOTS WITH 3 QUICK ONE-TAP BUTTONS) -->
+    <!-- ===================================================================== -->
+    <div id="modal-hints-hub" class="modal-backdrop">
+      <div class="confirm-modal-box hints-modal-box" style="max-width: 680px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18h6"></path>
+              <path d="M10 22h4"></path>
+              <path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"></path>
+            </svg>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">HINTS HUB</span>
+                <span class="mono text-secondary" style="font-size: 11px;">DROP CLUES</span>
+              </div>
+              <h3 style="font-size: 15px; margin-top: 2px;">Broadcast Clues for Your 10 Picks</h3>
+            </div>
+          </div>
+          <button id="btn-close-hints-hub" type="button" class="btn btn-sm">Close</button>
+        </div>
+
+        <p class="text-secondary" style="font-size: 12px; margin: 8px 0 10px 0; flex-shrink: 0;">
+          Select any unguessed slot below to broadcast an instant hint to all players on the main board!
+        </p>
+
+        <div id="hints-hub-slots-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+          <!-- Dynamically populated 10 slots -->
+        </div>
+
+        <div style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 10px; display: flex; justify-content: flex-end; flex-shrink: 0;">
+          <button id="btn-dismiss-hints-hub" type="button" class="btn btn-sm">Done</button>
         </div>
       </div>
     </div>
