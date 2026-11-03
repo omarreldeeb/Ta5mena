@@ -285,6 +285,7 @@ class GameController {
     this.roomUnsubscribe = null;
 
     // UI state
+    this.selectedTargetId = null;
     this.selectedTargetPlayerId = null;
     this.viewingPlayerId = null; // board viewing
     this.isViewingMySecretList = false;
@@ -3531,19 +3532,35 @@ class GameController {
   renderTargetPlayerSelector(room) {
     const players = room.players || {};
     const lists = room.lists || {};
-    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId && !players[id].left);
+    const currentTurnPlayerId = this.isLocalMode ? (room.game?.activePlayerId || this.myPlayerId) : this.myPlayerId;
+    const opponentIds = Object.keys(players).filter(id => id !== currentTurnPlayerId && !players[id].left);
 
-    // Find if current target selection is valid
-    if (this.selectedTargetPlayerId && this.isPlayerListCompleted(this.selectedTargetPlayerId, lists)) {
+    // 1. If selectedTargetId points to a completed/invalid player or self, reset it
+    const currentSelectedId = this.selectedTargetId || this.selectedTargetPlayerId;
+    if (currentSelectedId && (
+      currentSelectedId === currentTurnPlayerId ||
+      !players[currentSelectedId] ||
+      players[currentSelectedId].left ||
+      this.isPlayerListCompleted(currentSelectedId, lists)
+    )) {
+      this.selectedTargetId = null;
       this.selectedTargetPlayerId = null;
     }
 
-    // Auto-select first valid opponent if none selected
-    if (!this.selectedTargetPlayerId) {
+    // 2. Default selectedTargetId to the first valid opponent if none selected
+    if (!this.selectedTargetId && !this.selectedTargetPlayerId) {
       const firstValid = opponentIds.find(id => !this.isPlayerListCompleted(id, lists));
       if (firstValid) {
+        this.selectedTargetId = firstValid;
         this.selectedTargetPlayerId = firstValid;
       }
+    }
+
+    const activeTargetId = this.selectedTargetId || this.selectedTargetPlayerId;
+
+    // Sync lower Opponent List Card view if viewingPlayerId is unset or invalid
+    if (!this.isViewingMySecretList && (!this.viewingPlayerId || !players[this.viewingPlayerId] || players[this.viewingPlayerId].left)) {
+      this.viewingPlayerId = activeTargetId;
     }
 
     this.targetPlayerGrid.innerHTML = "";
@@ -3551,25 +3568,72 @@ class GameController {
       const p = players[id];
       if (!p) return;
       const isCompleted = this.isPlayerListCompleted(id, lists);
-      const isSelected = (id === this.selectedTargetPlayerId);
+      const isSelected = (id === activeTargetId && !isCompleted);
 
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `target-btn ${isSelected ? 'selected' : ''} ${isCompleted ? 'disabled' : ''}`;
+      btn.className = `target-btn target-player-btn ${isSelected ? 'selected active' : ''} ${isCompleted ? 'disabled' : ''}`;
+      btn.dataset.playerId = id;
+
+      const badgeText = isCompleted ? 'DONE' : (isSelected ? 'SELECTED ✓' : 'TARGET');
+      const badgeStyle = isSelected ? 'style="color: #FF4D00; font-weight: 800; font-size: 11px;"' : 'style="font-size: 11px;"';
+
       btn.innerHTML = `
-        <span>${this.escapeHtml(p.name)}</span>
-        <span class="mono" style="font-size: 11px;">${isCompleted ? 'DONE' : 'TARGET'}</span>
+        <span class="target-player-name">${this.escapeHtml(p.name)}</span>
+        <span class="mono target-badge" ${badgeStyle}>${badgeText}</span>
       `;
 
       if (!isCompleted) {
         btn.addEventListener("click", () => {
+          // 1. Set selectedTargetId = clickedPlayerId
+          this.selectedTargetId = id;
           this.selectedTargetPlayerId = id;
+
+          // 2. Immediately loop through all target player buttons in the Turn Control box:
+          // remove .selected / .active from all of them, and add .selected / .active to the clicked button.
+          const allTargetBtns = this.targetPlayerGrid.querySelectorAll(".target-btn, .target-player-btn");
+          allTargetBtns.forEach(b => {
+            const isThisOne = (b.dataset.playerId === id || b === btn);
+            if (isThisOne) {
+              b.classList.add("selected", "active");
+            } else {
+              b.classList.remove("selected", "active");
+            }
+            const badge = b.querySelector(".target-badge, .mono");
+            if (badge) {
+              if (b.classList.contains("disabled")) {
+                badge.textContent = "DONE";
+                badge.style.color = "";
+                badge.style.fontWeight = "";
+              } else if (isThisOne) {
+                badge.textContent = "SELECTED ✓";
+                badge.style.color = "#FF4D00";
+                badge.style.fontWeight = "800";
+              } else {
+                badge.textContent = "TARGET";
+                badge.style.color = "";
+                badge.style.fontWeight = "";
+              }
+            }
+          });
+
+          // 3. Also sync the lower Opponent List Card view to switch to that selected opponent's list tab automatically so the player sees the board of the person they are targeting!
           this.viewingPlayerId = id;
           this.isViewingMySecretList = false;
-          this.btnToggleMyList.classList.remove("active");
-          this.renderTargetPlayerSelector(room);
+          this.btnToggleMyList?.classList.remove("active");
+
+          // Sync missed guesses box for newly selected target
+          if (players[id]) {
+            const targetP = players[id];
+            const missedList = targetP.missedGuesses 
+              ? (Array.isArray(targetP.missedGuesses) ? targetP.missedGuesses : Object.values(targetP.missedGuesses))
+              : [];
+            this.renderMissedGuesses(this.targetMissedGuessesBox, this.targetMissedGuessesList, missedList);
+          }
+
           this.renderPlayerTabs(room);
           this.renderBoardSlots(room);
+          this.updateSubmitButtonState();
         });
       }
 
@@ -3577,8 +3641,8 @@ class GameController {
     });
 
     // Render missed guesses on the targeted player
-    if (this.selectedTargetPlayerId && players[this.selectedTargetPlayerId]) {
-      const targetP = players[this.selectedTargetPlayerId];
+    if (activeTargetId && players[activeTargetId]) {
+      const targetP = players[activeTargetId];
       const missedList = targetP.missedGuesses 
         ? (Array.isArray(targetP.missedGuesses) ? targetP.missedGuesses : Object.values(targetP.missedGuesses))
         : [];
@@ -3588,6 +3652,10 @@ class GameController {
     }
 
     this.updateSubmitButtonState();
+  }
+
+  renderTurnControls(room) {
+    this.renderTargetPlayerSelector(room);
   }
 
   isPlayerListCompleted(playerId, lists) {
@@ -3639,7 +3707,7 @@ class GameController {
 
   updateSubmitButtonState() {
     const guessText = this.inputTurnGuess.value.trim();
-    const hasTarget = !!this.selectedTargetPlayerId;
+    const hasTarget = !!(this.selectedTargetId || this.selectedTargetPlayerId);
     this.btnSubmitGuess.disabled = !hasTarget || guessText.length === 0;
   }
 
@@ -3648,7 +3716,7 @@ class GameController {
   // --------------------------------------------------------------------------
 
   async handleSubmitTurnGuess() {
-    const targetPlayerId = this.selectedTargetPlayerId;
+    const targetPlayerId = this.selectedTargetId || this.selectedTargetPlayerId;
     const guessText = this.inputTurnGuess.value.trim();
 
     if (!targetPlayerId || !guessText) return;
@@ -4774,6 +4842,7 @@ class GameController {
 
     this.myPlayerId = activePlayerId;
     this.myPlayerName = activePlayer ? activePlayer.name : "Player";
+    this.selectedTargetId = null;
     this.selectedTargetPlayerId = null;
     this.viewingPlayerId = null;
     this.isViewingMySecretList = false;
@@ -5117,6 +5186,7 @@ class GameController {
     this.currentRoomCode = null;
     this.myPlayerId = null;
     this.myPlayerName = "";
+    this.selectedTargetId = null;
     this.selectedTargetPlayerId = null;
     this.viewingPlayerId = null;
     this.isViewingMySecretList = false;

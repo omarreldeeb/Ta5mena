@@ -879,19 +879,46 @@ header.app-header {
   border-radius: var(--radius);
   color: var(--text-primary);
   cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .target-btn:hover {
   border-color: var(--border-strong);
 }
 
-.target-btn.selected {
-  border-color: var(--accent);
-  background-color: var(--bg-card-hover);
-  color: #FFFFFF;
+.target-btn.selected,
+.target-btn.active,
+.target-player-btn.selected,
+.target-player-btn.active {
+  border: 2px solid #FF4D00 !important;
+  background: rgba(255, 77, 0, 0.14) !important;
+  color: #FFFFFF !important;
 }
 
-.target-btn.disabled {
+.target-btn.selected:hover,
+.target-btn.active:hover,
+.target-player-btn.selected:hover,
+.target-player-btn.active:hover {
+  border: 2px solid #FF4D00 !important;
+  background: rgba(255, 77, 0, 0.22) !important;
+  color: #FFFFFF !important;
+}
+
+.target-btn.selected .target-badge,
+.target-btn.active .target-badge,
+.target-player-btn.selected .target-badge,
+.target-player-btn.active .target-badge,
+.target-btn.selected .mono,
+.target-btn.active .mono,
+.target-player-btn.selected .mono,
+.target-player-btn.active .mono {
+  color: #FF4D00 !important;
+  font-weight: 800 !important;
+}
+
+.target-btn.disabled,
+.target-player-btn.disabled {
   opacity: 0.35;
   cursor: not-allowed;
   pointer-events: none;
