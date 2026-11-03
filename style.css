@@ -36,6 +36,10 @@
 }
 
 html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  position: relative;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   background-color: var(--bg-main);
@@ -51,7 +55,6 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
 }
 
 /* ============================================================================
@@ -281,6 +284,8 @@ input::placeholder {
   width: 100%;
   margin: 0 auto;
   padding: 12px 14px 24px;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 header.app-header {
@@ -290,13 +295,14 @@ header.app-header {
   padding-bottom: 12px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
-  gap: 12px;
+  gap: 8px;
 }
 
 .logo-area {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .logo-mark {
@@ -330,23 +336,82 @@ header.app-header {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
+.header-room-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 82px;
+  flex-shrink: 0;
+}
+
+#header-room-tag,
 .room-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 4px 8px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 0 8px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  line-height: 1 !important;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
+  border-radius: var(--radius) !important;
+  cursor: pointer;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.room-tag:hover {
+  border-color: var(--border-strong);
+  background-color: var(--bg-card-hover);
 }
 
 .room-tag strong {
   color: var(--accent);
   letter-spacing: 0.05em;
+}
+
+#btn-header-leave,
+.btn-header-leave-compact {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  padding: 0 8px !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  line-height: 1 !important;
+  border-radius: var(--radius) !important;
+  background-color: transparent !important;
+  color: #FF3B30 !important;
+  border: 1px solid rgba(255, 59, 48, 0.45) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: all 0.15s ease !important;
+}
+
+#btn-header-leave:hover,
+.btn-header-leave-compact:hover {
+  background-color: rgba(255, 59, 48, 0.15) !important;
+  border-color: #FF3B30 !important;
+  color: #FF453A !important;
 }
 
 /* ============================================================================
@@ -1630,26 +1695,34 @@ header.app-header {
 }
 
 .floating-toast-close {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #FFFFFF !important;
   font-size: 16px;
   line-height: 1;
   width: 28px;
   height: 28px;
   border-radius: 4px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   flex-shrink: 0;
+  padding: 0 !important;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
+.floating-toast-close svg {
+  display: block !important;
+  stroke: #FFFFFF !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
 .floating-toast-close:hover {
-  background: #2a2a2a;
-  color: #FFFFFF;
-  border-color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #FFFFFF !important;
+  border-color: #FFFFFF !important;
 }
 
 .floating-toast-progress {
@@ -2100,6 +2173,51 @@ header.app-header {
   font-size: 13px;
   color: #FFFFFF;
   font-weight: 700;
+}
+
+/* ============================================================================
+   MOBILE HEADER & SCREEN OVERFLOW LOCK (DOWN TO 360PX)
+   ============================================================================ */
+@media (max-width: 420px) {
+  #app-container {
+    padding: 8px 8px 20px;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  header.app-header {
+    gap: 6px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+  .logo-title {
+    font-size: 15px;
+  }
+  .logo-sub {
+    font-size: 9px;
+  }
+  .header-meta {
+    gap: 4px;
+  }
+  .btn-hints,
+  .btn-my-list {
+    padding: 2px 6px;
+    font-size: 11px;
+    height: 26px;
+  }
+  .header-room-stack {
+    min-width: 76px;
+    gap: 3px;
+  }
+  #header-room-tag,
+  .room-tag,
+  #btn-header-leave,
+  .btn-header-leave-compact {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    font-size: 10px !important;
+    padding: 0 4px !important;
+  }
 }
 
 /* ============================================================================

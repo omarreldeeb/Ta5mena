@@ -303,7 +303,7 @@ class GameController {
     // 1-Device Pass & Play (Local Multiplayer) state
     this.isLocalMode = false;
     this.localMatch = null;
-    this.localPlayerCount = 3;
+    this.localPlayerCount = 2;
     this.localCategory = "singers";
     this.localCustomCategory = "";
     this.localCurrentEntryIndex = 0;
@@ -329,6 +329,7 @@ class GameController {
     };
 
     // Header & Floating Live Event Toast
+    this.headerRoomStack = document.getElementById("header-room-stack");
     this.headerRoomTag = document.getElementById("header-room-tag");
     this.headerRoomCode = document.getElementById("header-room-code");
     this.btnHeaderHints = document.getElementById("btn-header-hints");
@@ -665,9 +666,10 @@ class GameController {
     this.btnReconnect?.addEventListener("click", () => this.handleReconnect());
     this.btnDiscardSession?.addEventListener("click", () => this.discardSession());
 
-    // Lobby
-    this.lobbyRoomCode?.addEventListener("click", () => this.copyRoomInviteLink());
-    this.btnCopyCode?.addEventListener("click", () => this.copyRoomInviteLink());
+    // Lobby & Header Room Code Copy vs Invite Link
+    this.headerRoomTag?.addEventListener("click", () => this.copyRoomCodeOnly());
+    this.lobbyRoomCode?.addEventListener("click", () => this.copyRoomCodeOnly());
+    this.btnCopyCode?.addEventListener("click", () => this.copyRoomCodeOnly());
     this.btnShareLink?.addEventListener("click", () => this.copyRoomInviteLink());
     this.categoryOptionBtns?.forEach(btn => {
       btn?.addEventListener("click", (e) => {
@@ -792,11 +794,13 @@ class GameController {
     }
 
     if (viewName === "home" || (!this.currentRoomCode && !this.isLocalMode)) {
+      this.headerRoomStack?.classList.add("hidden");
       this.headerRoomTag?.classList.add("hidden");
       if (this.btnHeaderLeave) this.btnHeaderLeave.classList.add("hidden");
       if (this.btnHeaderHints) this.btnHeaderHints.classList.add("hidden");
       if (this.btnHeaderMyList) this.btnHeaderMyList.classList.add("hidden");
     } else {
+      this.headerRoomStack?.classList.remove("hidden");
       this.headerRoomTag?.classList.remove("hidden");
       if (this.headerRoomCode) {
         this.headerRoomCode.textContent = this.isLocalMode ? "PASS & PLAY" : this.currentRoomCode;
@@ -880,6 +884,9 @@ class GameController {
     if (this.systemAlertText) {
       this.systemAlertText.textContent = message;
     }
+    if (this.btnCloseAlert && !this.btnCloseAlert.querySelector("svg")) {
+      this.btnCloseAlert.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    }
 
     // Restart the 10-second CSS shrinking progress bar animation
     const oldProgress = document.getElementById("floating-toast-progress");
@@ -945,9 +952,28 @@ class GameController {
       }
     }
 
+    const activePlayers = Object.values(this.roomData?.players || {}).filter(p => !p.left);
+    const targetPlayer = this.roomData?.players?.[targetPlayerId];
+    const targetName = targetPlayer?.name || "Player";
+
     if (remaining === 0) {
       updates[`players/${targetPlayerId}/targetCompleted`] = true;
 
+      // 1v1 Head-to-Head Rule (Active Players === 2):
+      // The first player to completely reveal the other player's Top 10 list (55 pts) immediately WINS!
+      if (activePlayers.length === 2) {
+        updates["meta/status"] = "game_over";
+        const guesserName = this.myPlayerName || "Guesser";
+        const winText = `${guesserName} finished ${targetName}'s list (55 pts) and WINS the match!`;
+        updates["game/lastAction"] = {
+          text: winText,
+          type: "milestone",
+          timestamp: Date.now()
+        };
+        return winText;
+      }
+
+      // 3+ Player Multi-Stage Race Rule:
       const currentFinished = this.roomData?.finishedOrder 
         ? (Array.isArray(this.roomData.finishedOrder) ? [...this.roomData.finishedOrder] : Object.values(this.roomData.finishedOrder))
         : [];
@@ -958,8 +984,6 @@ class GameController {
 
         const placeNum = currentFinished.length;
         const placeText = this.getOrdinalPlace(placeNum);
-        const targetPlayer = this.roomData?.players?.[targetPlayerId];
-        const targetName = targetPlayer?.name || "Player";
         const milestoneText = `${targetName}'s list is 100% complete (${placeText})! The game continues until everyone finishes!`;
 
         updates["game/lastAction"] = {
@@ -1343,25 +1367,53 @@ class GameController {
 
     const savedPlayerId = localStorage.getItem("ta5mena_player_id");
     const existingPlayers = Object.values(room.players || {});
+    const normInputName = name.trim().toLowerCase();
 
-    // 1. Reconnection MUST ONLY match by unique playerId secret token in localStorage, NEVER by playerName string!
+    // 1. Seat Rejoin / Reconnection (by unique saved token OR matching seat of player who left)
+    let seatPlayer = null;
     if (savedPlayerId && room.players && room.players[savedPlayerId]) {
-      const mySeat = room.players[savedPlayerId];
-      this.saveSession(mySeat.id, mySeat.name, code);
+      seatPlayer = room.players[savedPlayerId];
+    } else {
+      seatPlayer = existingPlayers.find(p => p.name && p.name.trim().toLowerCase() === normInputName);
+    }
+
+    if (seatPlayer) {
+      const updates = {};
+      updates[`players/${seatPlayer.id}/connected`] = true;
+      updates[`players/${seatPlayer.id}/left`] = false;
+      updates["lastActivity"] = Date.now();
+
+      if (room.meta && room.meta.status === "playing") {
+        const currentTurnOrder = room.game?.turnOrder || [];
+        if (!currentTurnOrder.includes(seatPlayer.id)) {
+          updates["game/turnOrder"] = [...currentTurnOrder, seatPlayer.id];
+        }
+
+        // Active players after rejoining (bringing active count back to 3+)
+        const activeCount = existingPlayers.filter(p => p.id !== seatPlayer.id && !p.left).length + 1;
+        if (activeCount >= 3) {
+          updates["game/lastAction"] = {
+            text: `${seatPlayer.name} rejoined! Match returned to 3+ Player Mode.`,
+            type: "general",
+            timestamp: Date.now()
+          };
+        }
+      }
+
+      await db.update(`rooms/${code}`, updates);
+      this.saveSession(seatPlayer.id, seatPlayer.name, code);
       await this.touchRoomActivity(code);
-      await db.setPlayerConnected(code, mySeat.id, true);
-      await db.trackPlayerConnection(code, mySeat.id);
+      await db.setPlayerConnected(code, seatPlayer.id, true);
+      await db.trackPlayerConnection(code, seatPlayer.id);
       this.updateRoomUrl(code);
       this.subscribeToRoom(code);
-      this.showAlert(`Welcome back, ${mySeat.name}! Reconnected to seat.`);
+      this.showAlert(`Welcome back, ${seatPlayer.name}! Reconnected to seat.`);
       return;
     }
 
     // 2. Block duplicate player names (Fix Host Hijacking Bug):
-    // If any existing player has the same name (case-insensitive, trimmed) and a different playerId, BLOCK join!
-    const normInputName = name.trim().toLowerCase();
     const nameTaken = existingPlayers.some(
-      p => p.name && p.name.trim().toLowerCase() === normInputName && p.id !== savedPlayerId
+      p => p.name && p.name.trim().toLowerCase() === normInputName && !p.left && p.id !== savedPlayerId
     );
 
     if (nameTaken) {
@@ -1455,6 +1507,7 @@ class GameController {
     } catch (e) {}
 
     // 4. Clean up UI elements & switch to Home Screen instantly
+    this.headerRoomStack?.classList.add("hidden");
     this.btnHeaderHints?.classList.add("hidden");
     this.btnHeaderMyList?.classList.add("hidden");
     this.btnHeaderLeave?.classList.add("hidden");
@@ -1478,12 +1531,12 @@ class GameController {
       try {
         const room = await db.get(`rooms/${roomCode}`);
         if (room && room.players) {
-          const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
+          const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId && !p.left);
           const isLobby = !room.meta || room.meta.status === "lobby" || room.meta.status === "waiting";
           if (remainingPlayers.length === 0 || (isLobby && (this.isHost || remainingPlayers.length <= 1))) {
             // Delete room completely if empty or if left during solo lobby
             await db.remove(`rooms/${roomCode}`);
-          } else {
+          } else if (isLobby) {
             const updates = {};
             updates[`players/${playerId}`] = null;
             updates[`lists/${playerId}`] = null;
@@ -1499,6 +1552,22 @@ class GameController {
                   text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
                   timestamp: Date.now()
                 };
+              }
+            }
+
+            await db.update(`rooms/${roomCode}`, updates);
+          } else {
+            // In active match (playing or entry): preserve list so player can rejoin mid-game!
+            const updates = {};
+            updates[`players/${playerId}/left`] = true;
+            updates[`players/${playerId}/connected`] = false;
+            updates[`lastActivity`] = Date.now();
+
+            if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
+              const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
+              if (nextHost) {
+                updates[`players/${nextHost.id}/isHost`] = true;
+                updates[`meta/hostId`] = nextHost.id;
               }
             }
 
@@ -1652,11 +1721,13 @@ class GameController {
   }
 
   async cleanUpDepartedPlayer(kickedId, kickedName) {
-    const game = this.roomData?.game || {};
+    const room = this.roomData || (this.currentRoomCode ? await db.get(`rooms/${this.currentRoomCode}`) : null);
+    const game = room?.game || {};
     const currentTurnOrder = game.turnOrder || [];
     const updatedTurnOrder = currentTurnOrder.filter(id => id !== kickedId);
+    const remainingActivePlayers = Object.values(room?.players || {}).filter(p => p.id !== kickedId && !p.left);
 
-    if (updatedTurnOrder.length < 2) {
+    if (remainingActivePlayers.length < 2) {
       await db.update(`rooms/${this.currentRoomCode}/meta`, {
         status: "aborted",
         abortedReason: "Not enough players remaining to continue. Match closed."
@@ -1665,7 +1736,9 @@ class GameController {
     }
 
     const updates = {
-      "game/turnOrder": updatedTurnOrder
+      "game/turnOrder": updatedTurnOrder,
+      [`players/${kickedId}/left`]: true,
+      [`players/${kickedId}/connected`]: false
     };
 
     if (game.confirmation && (game.confirmation.toPlayerId === kickedId || game.confirmation.fromPlayerId === kickedId)) {
@@ -1685,10 +1758,19 @@ class GameController {
       }
     }
 
-    updates["game/lastAction"] = {
-      text: `${kickedName} was removed. Continuing match.`,
-      timestamp: Date.now()
-    };
+    if (remainingActivePlayers.length === 2) {
+      updates["game/lastAction"] = {
+        text: "Player left! Match switched to 2-Player Mode (First to finish opponent's list wins).",
+        type: "milestone",
+        timestamp: Date.now()
+      };
+    } else {
+      updates["game/lastAction"] = {
+        text: `${kickedName} left the room. Continuing match.`,
+        type: "general",
+        timestamp: Date.now()
+      };
+    }
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
   }
@@ -1991,7 +2073,7 @@ class GameController {
     const players = Object.values(room.players || {});
     const playerCount = players.length;
 
-    this.lobbyPlayerCount.textContent = `${playerCount} / MIN 3`;
+    this.lobbyPlayerCount.textContent = `${playerCount} / MIN 2`;
 
     // Category options
     this.categoryOptionBtns.forEach(btn => {
@@ -2083,11 +2165,11 @@ class GameController {
       }
     }
 
-    // Min players check (3 minimum as strictly required)
-    const canStart = playerCount >= 3;
+    // Min players check (2 minimum required)
+    const canStart = playerCount >= 2;
     if (this.isHost) {
       this.btnStartMatch.disabled = !canStart;
-      this.btnStartMatch.textContent = canStart ? "Start Match" : "Need 3+ Players";
+      this.btnStartMatch.textContent = canStart ? "Start Match" : "Need 2+ Players";
       this.lobbyMinPlayersAlert.classList.toggle("hidden", canStart);
     } else {
       this.btnStartMatch.disabled = true;
@@ -2134,9 +2216,9 @@ class GameController {
 
   async handleStartMatch() {
     if (!this.isHost || !this.currentRoomCode) return;
-    const players = Object.values(this.roomData.players || {});
-    if (players.length < 3) {
-      this.showAlert("Minimum 3 players required to start the match.");
+    const players = Object.values(this.roomData.players || {}).filter(p => !p.left);
+    if (players.length < 2) {
+      this.showAlert("Minimum 2 players required to start the match.");
       return;
     }
 
@@ -2184,6 +2266,20 @@ class GameController {
     this.showAlert(`Removed ${kickedPlayerName}.`);
   }
 
+  copyRoomCodeOnly() {
+    if (!this.currentRoomCode) return;
+    const code = this.currentRoomCode.toUpperCase();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => {
+        this.showAlert(`COPIED CODE: ${code}`);
+      }).catch(() => {
+        this.copyFallback(code, `COPIED CODE: ${code}`);
+      });
+    } else {
+      this.copyFallback(code, `COPIED CODE: ${code}`);
+    }
+  }
+
   copyRoomInviteLink() {
     if (!this.currentRoomCode) return;
     const inviteUrl = this.getRoomUrl(this.currentRoomCode);
@@ -2191,14 +2287,14 @@ class GameController {
       navigator.clipboard.writeText(inviteUrl).then(() => {
         this.showAlert("COPIED INVITE LINK");
       }).catch(() => {
-        this.copyFallback(inviteUrl);
+        this.copyFallback(inviteUrl, "COPIED INVITE LINK");
       });
     } else {
-      this.copyFallback(inviteUrl);
+      this.copyFallback(inviteUrl, "COPIED INVITE LINK");
     }
   }
 
-  copyFallback(text) {
+  copyFallback(text, alertMsg = "COPIED INVITE LINK") {
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.position = "fixed";
@@ -2207,13 +2303,13 @@ class GameController {
     ta.select();
     try {
       document.execCommand("copy");
-      this.showAlert("COPIED INVITE LINK");
+      this.showAlert(alertMsg);
     } catch (err) {}
     document.body.removeChild(ta);
   }
 
   copyRoomCode() {
-    this.copyRoomInviteLink();
+    this.copyRoomCodeOnly();
   }
 
   shareRoomLink() {
@@ -2710,7 +2806,7 @@ class GameController {
   renderTargetPlayerSelector(room) {
     const players = room.players || {};
     const lists = room.lists || {};
-    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId);
+    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId && !players[id].left);
 
     // Find if current target selection is valid
     if (this.selectedTargetPlayerId && this.isPlayerListCompleted(this.selectedTargetPlayerId, lists)) {
@@ -3139,7 +3235,7 @@ class GameController {
 
   renderPlayerTabs(room) {
     const players = room.players || {};
-    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId);
+    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId && !players[id].left);
 
     if (!this.viewingPlayerId && opponentIds.length > 0) {
       this.viewingPlayerId = opponentIds[0];
@@ -3326,7 +3422,7 @@ class GameController {
   }
 
   renderStandings(room) {
-    const players = Object.values(room.players || {});
+    const players = Object.values(room.players || {}).filter(p => !p.left);
     players.sort((a, b) => (b.points || 0) - (a.points || 0));
 
     this.liveStandingsGrid.innerHTML = "";
@@ -3364,16 +3460,30 @@ class GameController {
 
   checkGameCompletion(room) {
     if (room.meta.status !== "playing") return;
-    const players = Object.values(room.players || {});
+    const activePlayers = Object.values(room.players || {}).filter(p => !p.left);
     const lists = room.lists || {};
 
-    if (players.length < 2) return;
+    if (activePlayers.length < 2) return;
 
-    // The game continues until everyone finishes:
-    // Condition: every player's list is 100% revealed
-    const allCompleted = players.every(p => this.isPlayerListCompleted(p.id, lists));
+    let isGameOver = false;
 
-    if (allCompleted) {
+    if (activePlayers.length === 2) {
+      // 1v1 Head-to-Head Rule (Active Players === 2):
+      // First player to completely reveal the other player's Top 10 list (55 pts) immediately WINS!
+      const anyListCompleted = activePlayers.some(p => this.isPlayerListCompleted(p.id, lists));
+      const anyPlayerReached55 = activePlayers.some(p => (p.points || 0) >= 55);
+      if (anyListCompleted || anyPlayerReached55) {
+        isGameOver = true;
+      }
+    } else {
+      // 3+ Player Multi-Stage Race Rule: Continues until everyone finishes
+      const allCompleted = activePlayers.every(p => this.isPlayerListCompleted(p.id, lists));
+      if (allCompleted) {
+        isGameOver = true;
+      }
+    }
+
+    if (isGameOver) {
       if (this.isLocalMode) {
         this.localMatch.meta.status = "game_over";
         this.saveLocalMatch(this.localMatch);
@@ -3388,7 +3498,7 @@ class GameController {
   }
 
   renderGameOver(room) {
-    const players = Object.values(room.players || {});
+    const players = Object.values(room.players || {}).filter(p => !p.left);
     players.sort((a, b) => (b.points || 0) - (a.points || 0));
 
     const winner = players[0];
@@ -3565,7 +3675,7 @@ class GameController {
   }
 
   adjustLocalPlayerCount(delta) {
-    const nextCount = Math.max(3, Math.min(10, this.localPlayerCount + delta));
+    const nextCount = Math.max(2, Math.min(10, this.localPlayerCount + delta));
     if (nextCount === this.localPlayerCount) return;
     this.localPlayerCount = nextCount;
     if (this.localPlayerCountDisplay) {
@@ -3587,7 +3697,7 @@ class GameController {
     }
 
     if (this.btnLocalCountMinus) {
-      this.btnLocalCountMinus.disabled = (this.localPlayerCount <= 3);
+      this.btnLocalCountMinus.disabled = (this.localPlayerCount <= 2);
     }
     if (this.btnLocalCountPlus) {
       this.btnLocalCountPlus.disabled = (this.localPlayerCount >= 10);
@@ -3974,8 +4084,24 @@ class GameController {
       }
     }
 
+    const activeLocalPlayers = Object.keys(this.localMatch.players || {});
+    const is2PlayerLocal = (activeLocalPlayers.length === 2);
+
     let milestoneAnnouncement = null;
     if (allRevealed) {
+      if (is2PlayerLocal || newGuesserPoints >= 55) {
+        this.localMatch.meta.status = "game_over";
+        this.localMatch.game.lastAction = {
+          text: `${guesserPlayer.name} finished ${targetPlayerName}'s list (55 pts) and WINS the match!`,
+          type: "milestone",
+          timestamp: Date.now()
+        };
+        this.saveLocalMatch(this.localMatch);
+        this.renderGameOver(this.localMatch);
+        this.switchView("game_over");
+        return;
+      }
+
       if (!this.localMatch.finishedOrder) this.localMatch.finishedOrder = [];
       if (!this.localMatch.finishedOrder.includes(targetPlayerId)) {
         this.localMatch.finishedOrder.push(targetPlayerId);
@@ -3996,15 +4122,22 @@ class GameController {
 
     // Check if entire match is finished
     const allLists = this.localMatch.lists || {};
-    const allPlayersDone = Object.keys(this.localMatch.players).every(pid => {
-      const pList = allLists[pid] || {};
-      for (let r = 1; r <= 10; r++) {
-        if (!pList[r] || !pList[r].revealed) return false;
-      }
-      return true;
-    });
+    let isLocalGameOver = false;
+    if (is2PlayerLocal) {
+      const anyReached55 = activeLocalPlayers.some(pid => (this.localMatch.players[pid]?.points || 0) >= 55);
+      const anyCompleted = activeLocalPlayers.some(pid => this.isPlayerListCompleted(pid, allLists));
+      if (anyReached55 || anyCompleted) isLocalGameOver = true;
+    } else {
+      isLocalGameOver = activeLocalPlayers.every(pid => {
+        const pList = allLists[pid] || {};
+        for (let r = 1; r <= 10; r++) {
+          if (!pList[r] || !pList[r].revealed) return false;
+        }
+        return true;
+      });
+    }
 
-    if (allPlayersDone) {
+    if (isLocalGameOver) {
       this.localMatch.meta.status = "game_over";
       this.saveLocalMatch(this.localMatch);
       this.renderGameOver(this.localMatch);
@@ -4265,6 +4398,7 @@ class GameController {
     this.btnHeaderMyList?.classList.add("hidden");
     this.btnHeaderLeave?.classList.add("hidden");
     this.headerRoomTag?.classList.add("hidden");
+    this.headerRoomStack?.classList.add("hidden");
 
     this.modalMyList?.classList.remove("open");
     this.modalMyList?.classList.add("hidden");

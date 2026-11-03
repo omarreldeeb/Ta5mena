@@ -20,10 +20,6 @@
         </div>
       </div>
       <div class="header-meta">
-        <div id="header-room-tag" class="room-tag hidden">
-          <span>ROOM</span>
-          <strong id="header-room-code">----</strong>
-        </div>
         <button id="btn-header-hints" type="button" class="btn btn-sm btn-hints hidden" title="Hints Hub">
           <svg class="icon icon-bulb" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18h6"></path>
@@ -35,9 +31,15 @@
         <button id="btn-header-my-list" type="button" class="btn btn-sm btn-my-list hidden">
           MY LIST
         </button>
-        <button id="btn-header-leave" type="button" class="btn btn-sm btn-danger-outline hidden" title="Leave this room">
-          LEAVE
-        </button>
+        <div id="header-room-stack" class="header-room-stack hidden">
+          <div id="header-room-tag" class="room-tag" title="Tap to copy room code" role="button" tabindex="0">
+            <span>ROOM</span>
+            <strong id="header-room-code">----</strong>
+          </div>
+          <button id="btn-header-leave" type="button" class="btn btn-header-leave-compact" title="Leave this room">
+            LEAVE
+          </button>
+        </div>
       </div>
     </header>
 
@@ -48,7 +50,7 @@
         <div id="floating-toast-text" class="floating-toast-text">System notice</div>
       </div>
       <button id="btn-floating-toast-close" type="button" class="floating-toast-close" title="Dismiss" aria-label="Dismiss">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
@@ -96,7 +98,7 @@
             <!-- Create Room Panel -->
             <div class="panel-box">
               <h3>HOST NEW MATCH</h3>
-              <p class="text-secondary" style="font-size: 13px;">Create a private room, pick a category, and invite at least 2 friends.</p>
+              <p class="text-secondary" style="font-size: 13px;">Create a private room, pick a category, and invite at least 1 friend.</p>
               <button id="btn-create-room" class="btn btn-primary btn-block">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                 Create Room
@@ -122,7 +124,7 @@
         <div id="local-reconnect-box" class="reconnect-card hidden mb-12">
           <div>
             <div class="text-secondary" style="font-size: 12px; font-weight: 700;">SAVED LOCAL MATCH</div>
-            <div style="font-size: 14px; font-weight: 600;">Resume 1-Device Match (<strong id="local-reconnect-info" class="text-accent">3 Players</strong>)</div>
+            <div style="font-size: 14px; font-weight: 600;">Resume 1-Device Match (<strong id="local-reconnect-info" class="text-accent">2 Players</strong>)</div>
           </div>
           <div style="display: flex; gap: 6px;">
             <button id="btn-local-resume" class="btn btn-primary btn-sm">Resume</button>
@@ -143,12 +145,12 @@
           <div class="local-setup-section mb-12">
             <div class="flex-between">
               <label style="font-weight: 700; font-size: 13px;">NUMBER OF PLAYERS</label>
-              <span class="badge">MIN 3 - MAX 10</span>
+              <span class="badge">MIN 2 - MAX 10</span>
             </div>
             <div class="local-count-control-row mt-8">
-              <button id="btn-local-count-minus" type="button" class="btn btn-count-step" aria-label="Decrease players">-</button>
+              <button id="btn-local-count-minus" type="button" class="btn btn-count-step" aria-label="Decrease players" disabled>-</button>
               <div class="local-count-display-box">
-                <span id="local-player-count-display">3</span>
+                <span id="local-player-count-display">2</span>
                 <span class="local-count-unit">PLAYERS</span>
               </div>
               <button id="btn-local-count-plus" type="button" class="btn btn-count-step" aria-label="Increase players">+</button>
@@ -238,16 +240,16 @@
               <span>ROOM CODE</span>
               <span class="badge" style="font-size: 9px; padding: 1px 4px; border-color: var(--border-strong);">TAP TO COPY</span>
             </div>
-            <div id="lobby-room-code" class="room-share-code" title="Tap to copy invite link" role="button" tabindex="0">----</div>
+            <div id="lobby-room-code" class="room-share-code" title="Tap to copy code" role="button" tabindex="0">----</div>
           </div>
           <div style="display: flex; gap: 6px;">
-            <button id="btn-copy-code" class="btn btn-sm">
+            <button id="btn-copy-code" class="btn btn-sm" title="Copy 4-letter room code">
               <svg class="icon" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
               Copy Code
             </button>
-            <button id="btn-share-link" class="btn btn-sm">
+            <button id="btn-share-link" class="btn btn-sm" title="Copy full invite link">
               <svg class="icon" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
-              Share Link
+              Share Invite
             </button>
           </div>
         </div>
@@ -319,14 +321,14 @@
       <div class="card">
         <div class="flex-between" style="margin-bottom: 10px;">
           <span style="font-weight: 700; font-size: 13px;">PLAYERS IN LOBBY</span>
-          <span id="lobby-player-count" class="badge">0 / MIN 3</span>
+          <span id="lobby-player-count" class="badge">0 / MIN 2</span>
         </div>
         <div id="lobby-player-list" class="player-roster">
           <!-- Populated dynamically -->
         </div>
 
         <div id="lobby-min-players-alert" class="entry-notice mt-12">
-          Minimum <strong>3 players</strong> required to start the match. Invite friends using the room code above.
+          Minimum <strong>2 players</strong> required to start the match. Invite friends using the room code above.
         </div>
 
         <div class="flex-between mt-12 gap-8">
