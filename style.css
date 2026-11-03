@@ -124,6 +124,15 @@ button, .btn {
   color: var(--text-primary);
   transition: background-color 0.12s ease, border-color 0.12s ease;
   user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus, .btn:focus {
+  outline: none;
 }
 
 button:hover:not(:disabled), .btn:hover:not(:disabled) {

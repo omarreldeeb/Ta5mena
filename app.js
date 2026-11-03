@@ -216,6 +216,19 @@ class DatabaseService {
     }
   }
 
+  async off(path) {
+    await this.initPromise;
+    if (this.isFirebaseReady && this.fbDb) {
+      try {
+        const { ref, off } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+        off(ref(this.fbDb, path));
+      } catch (err) {}
+    }
+    if (this.listeners.has(path)) {
+      this.listeners.delete(path);
+    }
+  }
+
   triggerLocalListeners(path, data) {
     // Notify exact and parent listeners
     for (const [listenPath, callbacks] of this.listeners.entries()) {
@@ -260,8 +273,7 @@ class GameController {
 
     this.cacheDomElements();
     this.bindEvents();
-    this.checkUrlRoomParam();
-    this.checkSavedSession();
+    this.initAppRouting();
     this.startLivenessCheck();
   }
 
@@ -422,11 +434,24 @@ class GameController {
       }
     });
 
-    // Persistent Leave Room Buttons (Header, Lobby, Pause Overlay, Game Over)
-    this.btnHeaderLeave.addEventListener("click", () => this.requestLeaveRoom());
-    this.btnLeaveRoom.addEventListener("click", () => this.requestLeaveRoom());
-    this.btnPauseLeaveRoom.addEventListener("click", () => this.requestLeaveRoom());
-    this.btnReturnHome.addEventListener("click", () => this.requestLeaveRoom());
+    // Document-level event delegation for Leave buttons:
+    // Ensures clicks are NEVER lost, detached, or swallowed by DOM re-renders or focus states
+    document.addEventListener("click", (e) => {
+      const leaveTrigger = e.target.closest("#btn-header-leave, #btn-leave-room, #btn-pause-leave-room, #btn-return-home");
+      if (leaveTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.requestLeaveRoom();
+      }
+    });
+
+    // Window navigation sync
+    window.addEventListener("hashchange", () => {
+      const codeInUrl = this.getRoomCodeFromUrl();
+      if (!codeInUrl && this.currentRoomCode) {
+        this.leaveRoom();
+      }
+    });
 
     // My List Drawer Toggle
     this.btnHeaderMyList.addEventListener("click", () => this.toggleMyListDrawer());
@@ -461,7 +486,7 @@ class GameController {
     this.btnCreateRoom.addEventListener("click", () => this.handleCreateRoom());
     this.btnJoinRoom.addEventListener("click", () => this.handleJoinRoom());
     this.inputRoomCode.addEventListener("input", (e) => {
-      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
     });
     this.inputRoomCode.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -549,43 +574,147 @@ class GameController {
   }
 
   // ==========================================================================
-  // URL PARAMS & AUTO-FILL (?room=XXXX)
+  // REAL ROOM URL ROUTING & SPA PERSISTENCE (#/ABCD, /ABCD, ?room=ABCD)
   // ==========================================================================
 
-  checkUrlRoomParam() {
+  getBaseUrl() {
+    return window.location.origin + window.location.pathname;
+  }
+
+  getRoomUrl(roomCode) {
+    const base = this.getBaseUrl().replace(/\/+$/, "");
+    return `${base}/#/${roomCode}`;
+  }
+
+  updateRoomUrl(roomCode) {
+    if (!roomCode) {
+      try {
+        const cleanBase = this.getBaseUrl();
+        window.history.replaceState(null, "", cleanBase);
+      } catch (e) {}
+      return;
+    }
+    try {
+      const roomUrl = this.getRoomUrl(roomCode);
+      window.history.replaceState({ roomCode }, "", roomUrl);
+    } catch (e) {}
+  }
+
+  getRoomCodeFromUrl() {
+    // 1. Check URL hash: #/ABCD or #ABCD
+    const rawHash = (window.location.hash || "").replace(/^#\/?/, "").trim().toUpperCase();
+    if (rawHash) {
+      const cleanHash = rawHash.replace(/[^A-Z]/g, "").slice(0, 4);
+      if (cleanHash.length === 4) return cleanHash;
+    }
+
+    // 2. Check query params: ?room=ABCD or ?p=/ABCD (from 404.html SPA redirect)
     try {
       const params = new URLSearchParams(window.location.search);
       const roomParam = params.get("room");
       if (roomParam) {
-        const cleanRoom = roomParam.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-        if (cleanRoom.length === 4 && this.inputRoomCode) {
-          this.inputRoomCode.value = cleanRoom;
+        const cleanParam = roomParam.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+        if (cleanParam.length === 4) return cleanParam;
+      }
+      const pParam = params.get("p");
+      if (pParam) {
+        const cleanP = pParam.replace(/^\/+|\/+$/g, "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+        if (cleanP.length === 4) return cleanP;
+      }
+    } catch (e) {}
+
+    // 3. Check direct pathname: /Ta5mena/ABCD or /ABCD
+    try {
+      const segments = window.location.pathname.split("/").filter(Boolean);
+      if (segments.length > 0) {
+        const last = segments[segments.length - 1].toUpperCase();
+        if (/^[A-Z]{4}$/.test(last) && !last.includes(".")) {
+          return last;
         }
       }
     } catch (e) {}
+
+    return null;
   }
 
-  // ==========================================================================
-  // SESSION PERSISTENCE, RECONNECTION & AUTO-CLEANUP
-  // ==========================================================================
-
-  async checkSavedSession() {
-    const savedId = localStorage.getItem("ta5mena_player_id");
+  async initAppRouting() {
     const savedName = localStorage.getItem("ta5mena_player_name");
-    const savedRoom = localStorage.getItem("ta5mena_room_code");
-
     if (savedName) {
       this.inputPlayerName.value = savedName;
       this.myPlayerName = savedName;
     }
 
-    if (savedId && savedRoom && savedName) {
-      this.reconnectRoomLabel.textContent = savedRoom;
-      this.reconnectNameLabel.textContent = savedName;
-      // Auto-reconnect seamlessly if room and player exist and are active
-      await this.handleReconnect(true);
+    const roomCodeFromUrl = this.getRoomCodeFromUrl();
+
+    // If base website URL with NO room code in URL:
+    // ALWAYS show the fresh Home Screen (Create / Join Room) and clear any stale room session!
+    if (!roomCodeFromUrl) {
+      localStorage.removeItem("ta5mena_room_code");
+      this.currentRoomCode = null;
+      this.reconnectBox.classList.add("hidden");
+      this.switchView("home");
+      return;
+    }
+
+    // Specific room URL requested: sync canonical hash into address bar
+    this.updateRoomUrl(roomCodeFromUrl);
+
+    let room = null;
+    try {
+      room = await db.get(`rooms/${roomCodeFromUrl}`);
+    } catch (err) {}
+
+    // Check if room expired, does not exist, or has 0 connected players after inactivity
+    const lastActivity = room?.lastActivity || room?.meta?.createdAt || 0;
+    const isInactive1Hr = (Date.now() - lastActivity) > 3600000;
+    const players = Object.values(room?.players || {});
+    const allOffline = players.length === 0 || players.every(p => p.connected === false);
+    const roomAge = Date.now() - (room?.meta?.createdAt || lastActivity);
+    const isDead10Min = allOffline && roomAge > 600000;
+
+    if (!room || isInactive1Hr || isDead10Min) {
+      if (room) {
+        try {
+          await db.remove(`rooms/${roomCodeFromUrl}`);
+        } catch (e) {}
+      }
+      this.discardSession();
+      this.updateRoomUrl(null);
+      this.switchView("home");
+      this.showAlert("Room expired or no longer exists.");
+      return;
+    }
+
+    // Room is active: check if saved playerId belongs to this room
+    const savedPlayerId = localStorage.getItem("ta5mena_player_id");
+    if (savedPlayerId && room.players && room.players[savedPlayerId]) {
+      // Reconnect existing seat
+      const me = room.players[savedPlayerId];
+      this.myPlayerId = savedPlayerId;
+      this.myPlayerName = me.name;
+      this.currentRoomCode = roomCodeFromUrl;
+      this.saveSession(savedPlayerId, me.name, roomCodeFromUrl);
+      this.reconnectBox.classList.add("hidden");
+
+      await this.touchRoomActivity(roomCodeFromUrl);
+      await db.setPlayerConnected(roomCodeFromUrl, savedPlayerId, true);
+      await db.trackPlayerConnection(roomCodeFromUrl, savedPlayerId);
+      this.subscribeToRoom(roomCodeFromUrl);
+      this.showAlert(`Reconnected to room ${roomCodeFromUrl}!`);
+    } else {
+      // Player does not have a seat in this room: pre-fill room code on Home Screen
+      this.inputRoomCode.value = roomCodeFromUrl;
+      this.switchView("home");
+      if (!savedName) {
+        this.inputPlayerName.focus();
+      }
+      this.showAlert(`Enter your name and tap Join Room to enter ${roomCodeFromUrl}.`);
     }
   }
+
+  // ==========================================================================
+  // SESSION PERSISTENCE & TOUCH HELPERS
+  // ==========================================================================
 
   saveSession(playerId, name, roomCode) {
     this.myPlayerId = playerId;
@@ -609,64 +738,8 @@ class GameController {
     } catch (e) {}
   }
 
-  async handleReconnect(isAuto = false) {
-    const savedId = localStorage.getItem("ta5mena_player_id");
-    const savedName = localStorage.getItem("ta5mena_player_name");
-    const savedRoom = localStorage.getItem("ta5mena_room_code");
-
-    if (!savedId || !savedRoom || !savedName) return;
-
-    let room = null;
-    try {
-      room = await db.get(`rooms/${savedRoom}`);
-    } catch (err) {}
-
-    if (!room) {
-      if (!isAuto) this.showAlert("Room no longer exists.");
-      this.discardSession();
-      this.switchView("home");
-      return;
-    }
-
-    // Critical Inactivity & Staleness Checks:
-    // 1. Room inactive > 1 hour (3600000ms)
-    // 2. All players disconnected and room older than 10 minutes (600000ms)
-    const lastActivity = room.lastActivity || room.meta?.createdAt || 0;
-    const isInactive1Hr = (Date.now() - lastActivity) > 3600000;
-    const players = Object.values(room.players || {});
-    const allOffline = players.length === 0 || players.every(p => p.connected === false);
-    const roomAge = Date.now() - (room.meta?.createdAt || lastActivity);
-    const isDead10Min = allOffline && roomAge > 600000;
-
-    if (isInactive1Hr || isDead10Min) {
-      try {
-        await db.remove(`rooms/${savedRoom}`);
-      } catch (e) {}
-      this.discardSession();
-      this.switchView("home");
-      if (!isAuto) {
-        this.showAlert("Previous room expired due to inactivity.");
-      }
-      return;
-    }
-
-    if (!room.players || !room.players[savedId]) {
-      if (!isAuto) this.showAlert("Player session not found in this room.");
-      this.discardSession();
-      this.switchView("home");
-      return;
-    }
-
-    this.myPlayerId = savedId;
-    this.myPlayerName = savedName;
-    this.currentRoomCode = savedRoom;
-    this.reconnectBox.classList.add("hidden");
-
-    await this.touchRoomActivity(savedRoom);
-    await db.setPlayerConnected(savedRoom, savedId, true);
-    await db.trackPlayerConnection(savedRoom, savedId);
-    this.subscribeToRoom(savedRoom);
-    this.showAlert(`Reconnected to room ${savedRoom} as ${savedName}!`);
+  async handleReconnect() {
+    await this.initAppRouting();
   }
 
   startLivenessCheck() {
@@ -691,10 +764,10 @@ class GameController {
   // ==========================================================================
 
   generateRoomCode() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // Strictly uppercase letters (no 0-9)
     let code = "";
     for (let i = 0; i < 4; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+      code += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     return code;
   }
@@ -751,12 +824,13 @@ class GameController {
     await db.set(`rooms/${roomCode}`, initialRoom);
     await db.trackPlayerConnection(roomCode, playerId);
     this.saveSession(playerId, name, roomCode);
+    this.updateRoomUrl(roomCode);
     this.subscribeToRoom(roomCode);
   }
 
   async handleJoinRoom() {
     const name = this.inputPlayerName.value.trim();
-    const code = this.inputRoomCode.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+    const code = this.inputRoomCode.value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
 
     if (!name) {
       this.showAlert("Please enter your name first.");
@@ -764,7 +838,7 @@ class GameController {
       return;
     }
     if (code.length !== 4) {
-      this.showAlert("Room code must be 4 characters.");
+      this.showAlert("Room code must be 4 letters.");
       this.inputRoomCode.focus();
       return;
     }
@@ -775,27 +849,41 @@ class GameController {
       return;
     }
 
-    // Check if an existing player has the exact same name (case-insensitive)
-    const existingPlayer = Object.values(room.players || {}).find(
-      p => p.name && p.name.trim().toLowerCase() === name.toLowerCase()
+    const savedPlayerId = localStorage.getItem("ta5mena_player_id");
+    const existingPlayers = Object.values(room.players || {});
+
+    // 1. Reconnection MUST ONLY match by unique playerId secret token in localStorage, NEVER by playerName string!
+    if (savedPlayerId && room.players && room.players[savedPlayerId]) {
+      const mySeat = room.players[savedPlayerId];
+      this.saveSession(mySeat.id, mySeat.name, code);
+      await this.touchRoomActivity(code);
+      await db.setPlayerConnected(code, mySeat.id, true);
+      await db.trackPlayerConnection(code, mySeat.id);
+      this.updateRoomUrl(code);
+      this.subscribeToRoom(code);
+      this.showAlert(`Welcome back, ${mySeat.name}! Reconnected to seat.`);
+      return;
+    }
+
+    // 2. Block duplicate player names (Fix Host Hijacking Bug):
+    // If any existing player has the same name (case-insensitive, trimmed) and a different playerId, BLOCK join!
+    const normInputName = name.trim().toLowerCase();
+    const nameTaken = existingPlayers.some(
+      p => p.name && p.name.trim().toLowerCase() === normInputName && p.id !== savedPlayerId
     );
 
-    if (existingPlayer) {
-      // Reconnect to existing player seat!
-      this.saveSession(existingPlayer.id, existingPlayer.name, code);
-      await this.touchRoomActivity(code);
-      await db.setPlayerConnected(code, existingPlayer.id, true);
-      await db.trackPlayerConnection(code, existingPlayer.id);
-      this.subscribeToRoom(code);
-      this.showAlert(`Welcome back, ${existingPlayer.name}! Reconnected to seat.`);
+    if (nameTaken) {
+      this.showAlert("That name is already taken in this room. Please choose a different name.");
+      this.inputPlayerName.focus();
       return;
     }
 
-    if (room.meta.status !== "lobby") {
-      this.showAlert("This match has already started and no seat matching your name was found.");
+    if (room.meta && room.meta.status !== "lobby") {
+      this.showAlert("This match has already started and you do not have an existing seat in this room.");
       return;
     }
 
+    // 3. Brand new player joining lobby
     const playerId = this.generatePlayerId();
     const newPlayer = {
       id: playerId,
@@ -811,6 +899,7 @@ class GameController {
     await this.touchRoomActivity(code);
     await db.trackPlayerConnection(code, playerId);
     this.saveSession(playerId, name, code);
+    this.updateRoomUrl(code);
     this.subscribeToRoom(code);
   }
 
@@ -846,59 +935,94 @@ class GameController {
     const roomCode = this.currentRoomCode;
     const playerId = this.myPlayerId;
     const playerName = this.myPlayerName;
-    if (!roomCode || !playerId) {
-      this.leaveRoom();
-      return;
+
+    // 1. FIRST: Detach all active Firebase listeners for this room so client is immediately detached
+    if (this.roomUnsubscribe) {
+      try { this.roomUnsubscribe(); } catch (e) {}
+      this.roomUnsubscribe = null;
+    }
+    if (roomCode) {
+      try { await db.off(`rooms/${roomCode}`); } catch (e) {}
+    }
+    if (roomCode && playerId) {
+      try { await db.stopPlayerConnectionTracking(roomCode, playerId); } catch (e) {}
     }
 
-    const room = await db.get(`rooms/${roomCode}`);
-    if (room && room.players) {
-      const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
-      if (remainingPlayers.length === 0) {
-        // No players remaining: delete entire room node
-        try {
-          await db.remove(`rooms/${roomCode}`);
-        } catch (e) {}
-      } else {
-        const updates = {};
-        updates[`players/${playerId}`] = null;
-        updates[`lists/${playerId}`] = null;
-        updates[`lastActivity`] = Date.now();
+    // 2. Remove player from Firebase (and delete room completely if 0 players remain)
+    if (roomCode && playerId) {
+      try {
+        const room = await db.get(`rooms/${roomCode}`);
+        if (room && room.players) {
+          const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
+          if (remainingPlayers.length === 0) {
+            // 0 players remaining: completely delete rooms/{roomCode} so room URL is destroyed
+            await db.remove(`rooms/${roomCode}`);
+          } else {
+            const updates = {};
+            updates[`players/${playerId}`] = null;
+            updates[`lists/${playerId}`] = null;
+            updates[`lastActivity`] = Date.now();
 
-        // Host Migration: assign host to next connected player so room never becomes hostless
-        if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
-          const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
-          updates[`players/${nextHost.id}/isHost`] = true;
-          updates[`meta/hostId`] = nextHost.id;
-          updates[`game/lastAction`] = {
-            text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
-            timestamp: Date.now()
-          };
+            // Host Migration: assign host to next connected player so room never becomes hostless
+            if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
+              const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
+              updates[`players/${nextHost.id}/isHost`] = true;
+              updates[`meta/hostId`] = nextHost.id;
+              updates[`game/lastAction`] = {
+                text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
+                timestamp: Date.now()
+              };
+            }
+
+            await db.update(`rooms/${roomCode}`, updates);
+
+            if (room.meta && room.meta.status === "playing") {
+              await this.cleanUpDepartedPlayer(playerId, playerName);
+            }
+          }
         }
-
-        await db.update(`rooms/${roomCode}`, updates);
-
-        if (room.meta && room.meta.status === "playing") {
-          await this.cleanUpDepartedPlayer(playerId, playerName);
-        }
+      } catch (err) {
+        console.warn("[Ta5mena] Error during leave:", err);
       }
     }
 
-    this.leaveRoom();
+    // 3. Wipe room session from localStorage & reset state
+    this.discardSession();
+    this.currentRoomCode = null;
+    this.roomData = null;
+    this.isHost = false;
+
+    // 4. Reset URL back to base homepage
+    this.updateRoomUrl(null);
+
+    // 5. Clean up UI elements & switch to Home Screen
+    this.btnHeaderMyList?.classList.add("hidden");
+    this.btnHeaderLeave?.classList.add("hidden");
+    this.modalMyList?.classList.remove("open");
+    if (this.modalConfirmation) this.modalConfirmation.classList.remove("open");
+    if (this.waitingConfirmationBackdrop) this.waitingConfirmationBackdrop.classList.remove("open");
+    this.hidePauseOverlay();
+    this.closeGiveHintModal();
+    this.closeConfirmModal();
+    this.switchView("home");
   }
 
   leaveRoom() {
     if (this.roomUnsubscribe) {
-      this.roomUnsubscribe();
+      try { this.roomUnsubscribe(); } catch (e) {}
       this.roomUnsubscribe = null;
     }
+    if (this.currentRoomCode) {
+      try { db.off(`rooms/${this.currentRoomCode}`); } catch (e) {}
+    }
     if (this.currentRoomCode && this.myPlayerId) {
-      db.stopPlayerConnectionTracking(this.currentRoomCode, this.myPlayerId);
+      try { db.stopPlayerConnectionTracking(this.currentRoomCode, this.myPlayerId); } catch (e) {}
     }
     this.discardSession();
     this.currentRoomCode = null;
     this.roomData = null;
     this.isHost = false;
+    this.updateRoomUrl(null);
     this.btnHeaderMyList?.classList.add("hidden");
     this.btnHeaderLeave?.classList.add("hidden");
     this.modalMyList?.classList.remove("open");
@@ -1413,7 +1537,7 @@ class GameController {
 
   copyRoomInviteLink() {
     if (!this.currentRoomCode) return;
-    const inviteUrl = window.location.origin + window.location.pathname + `?room=${this.currentRoomCode}`;
+    const inviteUrl = this.getRoomUrl(this.currentRoomCode);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(inviteUrl).then(() => {
         this.showAlert("COPIED INVITE LINK");

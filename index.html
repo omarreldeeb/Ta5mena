@@ -75,9 +75,9 @@
           <!-- Join Room Panel -->
           <div class="panel-box">
             <h3>JOIN EXISTING ROOM</h3>
-            <p class="text-secondary" style="font-size: 13px;">Enter the 4-character room code shared by your host.</p>
+            <p class="text-secondary" style="font-size: 13px;">Enter the 4-letter room code shared by your host.</p>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
+              <input type="text" id="input-room-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" pattern="[A-Za-z]{4}" style="text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; letter-spacing: 0.1em; text-align: center;">
               <button id="btn-join-room" class="btn btn-block" style="flex: 1;">Join Room</button>
             </div>
           </div>

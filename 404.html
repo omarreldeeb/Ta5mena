@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ta5mena</title>
+  <script>
+    // GitHub Pages Single Page App Redirect
+    // Converts /Ta5mena/ABCD into /Ta5mena/#/ABCD so the browser stays within the SPA
+    (function() {
+      var path = window.location.pathname;
+      var repoName = "/Ta5mena";
+      var basePath = path.startsWith(repoName) ? repoName : "";
+      var relativePath = path.slice(basePath.length).replace(/^\/+|\/+$/g, "");
+      
+      var targetUrl = window.location.origin + basePath + "/";
+      if (relativePath) {
+        targetUrl += "#/" + relativePath;
+      }
+      if (window.location.search) {
+        targetUrl += window.location.search;
+      }
+      window.location.replace(targetUrl);
+    })();
+  </script>
+</head>
+<body style="background-color: #111111; color: #F5F5F5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+  <p style="font-weight: 700; font-size: 14px; letter-spacing: 0.05em;">LOADING TA5MENA...</p>
+</body>
+</html>
