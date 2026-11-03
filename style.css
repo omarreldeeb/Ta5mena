@@ -1465,21 +1465,54 @@ header.app-header {
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
 }
 
+/* ============================================================================
+   HINTS HUB MODAL (TWO-TAB / MOBILE OPTIMIZED / RESPONDER VIEW)
+   ============================================================================ */
+
+#modal-hints-hub.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom)) 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
 .hints-modal-box {
   background-color: var(--bg-card);
   border: 2px solid var(--border-strong);
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  margin: 0;
 }
 
-/* ============================================================================
-   TWO-TAB HINTS MODAL (REQUEST HINT VS GIVE HINT)
-   ============================================================================ */
+.hints-modal-header {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-card);
+}
 
 .hints-tab-bar {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 10px;
-  flex-shrink: 0;
+  background: var(--bg-card);
 }
 
 .hints-tab-btn {
@@ -1514,10 +1547,50 @@ header.app-header {
 }
 
 .hints-tab-pane {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#hints-tab-request-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px;
+}
+
+#hints-tab-give-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#hints-hub-slots-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.hints-modal-footer {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-card);
 }
 
 .hint-step-label {
@@ -1594,26 +1667,18 @@ header.app-header {
   font-weight: 900;
 }
 
-.hints-hub-slot-card.is-requested-target {
-  border-color: #FFD700 !important;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
-  animation: pulseHintBorder 1.5s infinite alternate ease-in-out;
-}
-
-@keyframes pulseHintBorder {
-  from { border-color: #FFD700; }
-  to { border-color: #FF9900; }
-}
-
+/* Slot Cards inside list */
 .hints-hub-slot-card {
   background-color: #161616;
   border: 1px solid #2A2A2A;
-  padding: 8px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   transition: border-color 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .hints-hub-slot-card:hover:not(.is-revealed) {
@@ -1625,73 +1690,132 @@ header.app-header {
   background-color: #121212;
 }
 
-.hints-hub-slot-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.hints-hub-slot-card.is-requested-target {
+  border-color: #FFD700 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+  animation: pulseHintBorder 1.5s infinite alternate ease-in-out;
 }
 
-.hints-hub-actions-row {
+@keyframes pulseHintBorder {
+  from { border-color: #FFD700; }
+  to { border-color: #FF9900; }
+}
+
+/* Row 1: Single-line flex row with slot on left and compact badge on right */
+.hints-hub-slot-row1 {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
 }
 
-.btn-hint-quick {
-  height: 26px;
-  padding: 0 8px;
+.hints-hub-slot-item-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.hints-hub-slot-rank {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.hints-hub-slot-name {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.hints-hub-slot-pts {
   font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.hints-hub-slot-status {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Row 2: [ 1st Letter ] and [ Length ] side-by-side (grid 1fr 1fr) */
+.hints-hub-slot-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+}
+
+.hints-hub-slot-row2 .btn-hint-quick {
+  height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 700;
-  border-radius: 2px;
+  border-radius: var(--radius);
   background-color: #222;
   border: 1px solid #3E3E3E;
   color: #E0E0E0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.12s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.btn-hint-quick:hover {
+.hints-hub-slot-row2 .btn-hint-quick:hover {
   background-color: #FFD700;
   color: #111111;
   border-color: #FFD700;
 }
 
-.hints-hub-custom-wrap {
+/* Row 3: Compact custom clue input (16px font-size, 36px height) + Send button */
+.hints-hub-slot-row3 {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 200px;
+  gap: 6px;
+  width: 100%;
 }
 
-.input-hints-hub-custom {
-  height: 26px;
-  padding: 0 8px;
-  font-size: 11px;
+.hints-hub-slot-row3 .input-hints-hub-custom {
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 16px;
   font-family: var(--font-sans);
   background: #101010;
   border: 1px solid #333;
   color: #FFFFFF;
-  border-radius: 2px;
-  flex: 1;
+  border-radius: var(--radius);
   outline: none;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
-.input-hints-hub-custom:focus {
+.hints-hub-slot-row3 .input-hints-hub-custom:focus {
   border-color: #FFD700;
 }
 
-.btn-hints-hub-send {
-  height: 26px;
-  padding: 0 10px;
-  font-size: 11px;
+.hints-hub-slot-row3 .btn-hints-hub-send {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 800;
-  border-radius: 2px;
+  border-radius: var(--radius);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 /* ============================================================================

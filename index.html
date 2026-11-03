@@ -698,28 +698,32 @@
     <!-- ===================================================================== -->
     <!-- VIEW: HINTS HUB MODAL (TWO TABS: REQUEST A HINT & GIVE MY OWN HINT) -->
     <!-- ===================================================================== -->
+    <!-- ===================================================================== -->
+    <!-- VIEW: HINTS HUB MODAL (TWO-TAB / REQUEST & GIVE CLUES) -->
+    <!-- ===================================================================== -->
     <div id="modal-hints-hub" class="modal-backdrop hidden">
-      <div class="confirm-modal-box hints-modal-box" style="max-width: 680px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
-        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div class="confirm-modal-box hints-modal-box">
+        <!-- FIXED HEADER -->
+        <div class="hints-modal-header">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+            <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
               <path d="M9 18h6"></path>
               <path d="M10 22h4"></path>
               <path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"></path>
             </svg>
-            <div>
+            <div style="min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">HINTS HUB</span>
+                <span id="hints-hub-tag-badge" class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">HINTS HUB</span>
                 <span id="hints-hub-status-badge" class="mono text-secondary" style="font-size: 11px;">ACTIVE TURN</span>
               </div>
-              <h3 id="hints-hub-title" style="font-size: 15px; margin-top: 2px;">Request or Give Clues</h3>
+              <h3 id="hints-hub-title" style="font-size: 15px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Request or Give Clues</h3>
             </div>
           </div>
-          <button id="btn-close-hints-hub" type="button" class="btn btn-sm">Close</button>
+          <button id="btn-close-hints-hub" type="button" class="btn btn-sm" style="flex-shrink: 0; margin-left: 8px;">Close</button>
         </div>
 
-        <!-- 2 TABS -->
-        <div class="hints-tab-bar mt-12 mb-12">
+        <!-- 2 TABS (HIDDEN WHEN RESPONDING TO AN INCOMING REQUEST) -->
+        <div id="hints-tab-bar" class="hints-tab-bar">
           <button id="btn-tab-hint-request" type="button" class="hints-tab-btn active">
             REQUEST A HINT
           </button>
@@ -728,7 +732,7 @@
           </button>
         </div>
 
-        <!-- TAB 1: REQUEST A HINT (DEFAULT) -->
+        <!-- TAB 1: REQUEST A HINT (DEFAULT FOR ACTIVE TURN PLAYER) -->
         <div id="hints-tab-request-pane" class="hints-tab-pane">
           <p class="text-secondary mb-12" style="font-size: 12px; margin-bottom: 10px;">
             Ask an opponent for a clue before submitting your guess!
@@ -757,16 +761,16 @@
 
         <!-- TAB 2: GIVE MY OWN HINT -->
         <div id="hints-tab-give-pane" class="hints-tab-pane hidden">
-          <p class="text-secondary" style="font-size: 12px; margin-bottom: 10px; flex-shrink: 0;">
-            Select any unguessed slot below to broadcast an instant hint to all players on the main board!
-          </p>
-
-          <div id="hints-hub-slots-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; max-height: 52vh;">
-            <!-- Dynamically populated 10 slots -->
+          <div id="hints-hub-slots-list">
+            <!-- Dynamically populated slots -->
           </div>
         </div>
 
-        <div style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 10px; display: flex; justify-content: flex-end; flex-shrink: 0;">
+        <!-- FIXED FOOTER -->
+        <div class="hints-modal-footer">
+          <button id="btn-hints-cancel-mind" type="button" class="btn btn-danger-outline hidden" style="flex: 1; font-weight: 700; font-size: 13px; height: 36px;">
+            I Changed My Mind (Cancel)
+          </button>
           <button id="btn-dismiss-hints-hub" type="button" class="btn btn-sm">Done</button>
         </div>
       </div>

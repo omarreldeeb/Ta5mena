@@ -358,6 +358,8 @@ class GameController {
     this.hintsHubSlotsList = document.getElementById("hints-hub-slots-list");
     this.btnCloseHintsHub = document.getElementById("btn-close-hints-hub");
     this.btnDismissHintsHub = document.getElementById("btn-dismiss-hints-hub");
+    this.btnHintsCancelMind = document.getElementById("btn-hints-cancel-mind");
+    this.hintsTabBar = document.getElementById("hints-tab-bar");
     this.btnTabHintRequest = document.getElementById("btn-tab-hint-request");
     this.btnTabHintGive = document.getElementById("btn-tab-hint-give");
     this.hintsTabRequestPane = document.getElementById("hints-tab-request-pane");
@@ -366,6 +368,7 @@ class GameController {
     this.hintRequestSlotsGrid = document.getElementById("hint-request-slots-grid");
     this.btnSendHintRequest = document.getElementById("btn-send-hint-request");
     this.hintsHubStatusBadge = document.getElementById("hints-hub-status-badge");
+    this.hintsHubTagBadge = document.getElementById("hints-hub-tag-badge");
     this.hintsHubTitle = document.getElementById("hints-hub-title");
 
     // Incoming Hint Request Modal (Online Multiplayer)
@@ -623,6 +626,7 @@ class GameController {
     });
     this.btnCloseHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
     this.btnDismissHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
+    this.btnHintsCancelMind?.addEventListener("click", () => this.handleCancelHintResponse());
     this.modalHintsHub?.addEventListener("click", (e) => {
       if (e.target === this.modalHintsHub) {
         this.closeHintsHubModal();
@@ -1858,18 +1862,79 @@ class GameController {
     const isPlaying = (room.meta?.status === "playing");
     const activePlayerId = room.game?.activePlayerId || (room.game?.turnOrder ? room.game.turnOrder[room.game.currentTurnIndex || 0] : null);
     const isMyTurn = (isPlaying && activePlayerId === this.myPlayerId);
-    if (!isMyTurn && !this.isRespondingToHintRequest) {
+    const isResponding = this.isRespondingToHintRequest || (!isMyTurn && isPlaying);
+
+    if (!isMyTurn && !isResponding) {
       this.showAlert("You can only drop hints during your turn or when responding to a hint request!");
       return;
     }
 
-    // If responding to an incoming request, force tab 2 'give'
-    const chosenTab = this.isRespondingToHintRequest ? "give" : defaultTab;
-    this.switchHintsTab(chosenTab);
+    if (isResponding) {
+      this.isRespondingToHintRequest = true;
+      const requesterName = this.pendingIncomingHintRequest?.fromPlayerName || 
+                            this.pendingLocalHintRequest?.fromPlayerName || 
+                            room.hintRequest?.fromPlayerName || 
+                            "Opponent";
+      const reqSlot = this.requestedHintSlot || 
+                      this.pendingIncomingHintRequest?.requestedSlot || 
+                      this.pendingLocalHintRequest?.requestedSlot;
 
-    if (this.hintsHubStatusBadge) {
-      this.hintsHubStatusBadge.textContent = this.isRespondingToHintRequest ? "INCOMING REQUEST" : "ACTIVE TURN";
-      this.hintsHubStatusBadge.style.color = this.isRespondingToHintRequest ? "var(--accent)" : "#FFD700";
+      // 1. Completely HIDE the two top tab buttons
+      if (this.hintsTabBar) {
+        this.hintsTabBar.style.display = "none";
+      }
+
+      // 2. Change modal header title
+      if (this.hintsHubTitle) {
+        if (reqSlot && reqSlot !== "any") {
+          this.hintsHubTitle.textContent = `Drop a Hint for ${requesterName} (#${reqSlot})`;
+        } else {
+          this.hintsHubTitle.textContent = `Drop a Hint for ${requesterName}`;
+        }
+      }
+
+      if (this.hintsHubStatusBadge) {
+        this.hintsHubStatusBadge.textContent = "INCOMING REQUEST";
+        this.hintsHubStatusBadge.style.color = "var(--accent)";
+      }
+
+      if (this.hintsHubTagBadge) {
+        this.hintsHubTagBadge.textContent = "GIVE CLUE";
+      }
+
+      // 3. Show prominent [ I Changed My Mind (Cancel) ] button
+      if (this.btnHintsCancelMind) {
+        this.btnHintsCancelMind.classList.remove("hidden");
+      }
+      if (this.btnDismissHintsHub) {
+        this.btnDismissHintsHub.classList.add("hidden");
+      }
+
+      // Force Tab 2 'give'
+      this.switchHintsTab("give");
+    } else {
+      // Active turn mode
+      if (this.hintsTabBar) {
+        this.hintsTabBar.style.display = "";
+      }
+      if (this.hintsHubTitle) {
+        this.hintsHubTitle.textContent = "Request or Give Clues";
+      }
+      if (this.hintsHubStatusBadge) {
+        this.hintsHubStatusBadge.textContent = "ACTIVE TURN";
+        this.hintsHubStatusBadge.style.color = "#FFD700";
+      }
+      if (this.hintsHubTagBadge) {
+        this.hintsHubTagBadge.textContent = "HINTS HUB";
+      }
+      if (this.btnHintsCancelMind) {
+        this.btnHintsCancelMind.classList.add("hidden");
+      }
+      if (this.btnDismissHintsHub) {
+        this.btnDismissHintsHub.classList.remove("hidden");
+      }
+
+      this.switchHintsTab(defaultTab);
     }
 
     if (this.modalHintsHub) {
@@ -1879,6 +1944,14 @@ class GameController {
   }
 
   closeHintsHubModal() {
+    if (this.isRespondingToHintRequest) {
+      this.handleCancelHintResponse();
+      return;
+    }
+    this.closeHintsHubModalRaw();
+  }
+
+  closeHintsHubModalRaw() {
     if (this.modalHintsHub) {
       this.modalHintsHub.classList.remove("open");
       this.modalHintsHub.classList.add("hidden");
@@ -1887,30 +1960,81 @@ class GameController {
       this.hintsHubStatusBadge.textContent = "ACTIVE TURN";
       this.hintsHubStatusBadge.style.color = "";
     }
+    if (this.hintsHubTitle) {
+      this.hintsHubTitle.textContent = "Request or Give Clues";
+    }
+    if (this.hintsHubTagBadge) {
+      this.hintsHubTagBadge.textContent = "HINTS HUB";
+    }
+    if (this.hintsTabBar) {
+      this.hintsTabBar.style.display = "";
+    }
+    if (this.btnHintsCancelMind) {
+      this.btnHintsCancelMind.classList.add("hidden");
+    }
+    if (this.btnDismissHintsHub) {
+      this.btnDismissHintsHub.classList.remove("hidden");
+    }
+  }
 
-    if (this.isLocalHintResponse) {
-      // In 1-Device Pass & Play, if closed without giving hint, return phone to turn player
+  async handleCancelHintResponse() {
+    const isResponding = this.isRespondingToHintRequest;
+    const playerName = this.myPlayerName || "Player";
+    const declineMsg = `${playerName} changed their mind and declined the hint request.`;
+
+    if (this.isLocalMode) {
+      this.closeHintsHubModalRaw();
       const originId = this.localHintOriginPlayerId;
-      const originName = this.localMatch?.players?.[originId]?.name || "Turn Player";
-      this.myPlayerId = originId;
+      const originName = originId ? (this.localMatch?.players?.[originId]?.name || "Turn Player") : null;
+
+      if (isResponding) {
+        this.localMatch.game.lastAction = {
+          text: declineMsg,
+          type: "general",
+          timestamp: Date.now()
+        };
+        this.saveLocalMatch(this.localMatch);
+        this.showFloatingNotification(declineMsg, "general");
+      }
+
       this.isRespondingToHintRequest = false;
       this.isLocalHintResponse = false;
-      this.localHintOriginPlayerId = null;
       this.requestedHintSlot = null;
       this.pendingLocalHintRequest = null;
-      this.showPrivacyCurtain(
-        originName,
-        "Resuming turn. Make sure only the active player sees the screen.",
-        () => {
-          this.renderBoardSlots(this.localMatch);
-          this.updateMyListButtonVisibility(this.localMatch);
-        }
-      );
-    } else if (this.isRespondingToHintRequest) {
-      this.isRespondingToHintRequest = false;
-      this.requestedHintSlot = null;
-      this.pendingIncomingHintRequest = null;
+
+      if (originId) {
+        this.myPlayerId = originId;
+        this.localHintOriginPlayerId = null;
+        this.showPrivacyCurtain(
+          originName,
+          "Resuming turn. Make sure only the active player sees the screen.",
+          () => {
+            this.renderBoardSlots(this.localMatch);
+            this.updateMyListButtonVisibility(this.localMatch);
+          }
+        );
+      }
+      return;
     }
+
+    // Online Multiplayer Mode
+    this.closeHintsHubModalRaw();
+    this.isRespondingToHintRequest = false;
+    this.requestedHintSlot = null;
+    this.pendingIncomingHintRequest = null;
+
+    if (this.currentRoomCode && isResponding) {
+      const updates = {};
+      updates["hintRequest"] = null;
+      updates["game/lastAction"] = {
+        text: declineMsg,
+        type: "general",
+        timestamp: Date.now()
+      };
+      updates["lastActivity"] = Date.now();
+      await db.update(`rooms/${this.currentRoomCode}`, updates);
+    }
+    this.showFloatingNotification("You changed your mind and declined the hint request.", "general");
   }
 
   switchHintsTab(tabName) {
@@ -2254,6 +2378,9 @@ class GameController {
     if (!room || !room.lists || !this.myPlayerId) return;
     const myList = room.lists[this.myPlayerId] || {};
     const myHints = room.players?.[this.myPlayerId]?.hints || {};
+    const activePlayerId = room.game?.activePlayerId || (room.game?.turnOrder ? room.game.turnOrder[room.game.currentTurnIndex || 0] : null);
+    const isMyTurn = (room.meta?.status === "playing" && activePlayerId === this.myPlayerId);
+    const isResponding = this.isRespondingToHintRequest || (!isMyTurn && room.meta?.status === "playing");
 
     if (!this.hintsHubSlotsList) return;
     this.hintsHubSlotsList.innerHTML = "";
@@ -2263,6 +2390,12 @@ class GameController {
     for (let r = 1; r <= 10; r++) {
       const slot = myList[r] || { item: "", revealed: false, points: r };
       const hint = myHints[r];
+      
+      // When responding to a hint request, show ONLY unguessed slots!
+      if (isResponding && slot.revealed) {
+        continue;
+      }
+
       const isRequestedTarget = (this.requestedHintSlot && Number(this.requestedHintSlot) === r);
       const card = document.createElement("div");
       card.className = "hints-hub-slot-card" +
@@ -2272,41 +2405,47 @@ class GameController {
 
       if (slot.revealed) {
         card.innerHTML = `
-          <div class="hints-hub-slot-header">
-            <div>
-              <strong class="text-accent" style="font-family: var(--font-mono); font-size: 13px;">#${r}</strong>
-              <span style="font-weight: 700; margin-left: 6px; font-size: 13px;">${this.escapeHtml(slot.item || "Unknown")}</span>
+          <div class="hints-hub-slot-row1">
+            <div class="hints-hub-slot-item-info">
+              <strong class="text-accent hints-hub-slot-rank">#${r}</strong>
+              <span class="hints-hub-slot-name">${this.escapeHtml(slot.item || "Unknown")}</span>
+              <span class="mono text-secondary hints-hub-slot-pts">(+${slot.points || r} pts)</span>
             </div>
-            <span class="badge badge-success">GUESSED / REVEALED (+${slot.points || r} PTS)</span>
+            <span class="badge badge-success" style="font-size: 10px; white-space: nowrap;">REVEALED</span>
           </div>
-          <div class="text-secondary" style="font-size: 11px;">Already revealed by ${this.escapeHtml(slot.guessedBy || "an opponent")}. No clues needed.</div>
+          <div class="text-secondary" style="font-size: 11px;">Already revealed by ${this.escapeHtml(slot.guessedBy || "an opponent")}.</div>
         `;
       } else {
         const activeHintBadge = hint
-          ? `<span class="board-slot-hint-bright">${bulbSvg} 💡 HINT: ${this.escapeHtml(hint.text)}</span>`
-          : `<span class="mono text-secondary" style="font-size: 11px;">NO HINT DROPPED</span>`;
+          ? `<span class="board-slot-hint-bright" style="white-space: nowrap; font-size: 10px;">${bulbSvg} HINT SENT</span>`
+          : `<span class="mono text-secondary" style="white-space: nowrap; font-size: 10px;">NO HINT</span>`;
 
         const targetBadge = isRequestedTarget
-          ? `<span class="badge" style="background: rgba(255, 215, 0, 0.25); color: #FFD700; border: 1px solid #FFD700; font-weight: 800; font-size: 10px; margin-left: 6px;">🎯 REQUESTED TARGET</span>`
+          ? `<span class="badge" style="background: rgba(255, 215, 0, 0.25); color: #FFD700; border: 1px solid #FFD700; font-weight: 800; font-size: 10px; margin-left: 4px; white-space: nowrap;">🎯 TARGET</span>`
           : "";
 
         card.innerHTML = `
-          <div class="hints-hub-slot-header">
-            <div>
-              <strong class="text-accent" style="font-family: var(--font-mono); font-size: 13px;">#${r}</strong>
-              <span style="font-weight: 700; margin-left: 6px; font-size: 13px;">${this.escapeHtml(slot.item || "Secret Pick")}</span>
-              <span class="mono text-secondary" style="font-size: 11px; margin-left: 6px;">(${r} pts)</span>
+          <!-- Row 1: Single-line flex row with slot on left and compact badge on right -->
+          <div class="hints-hub-slot-row1">
+            <div class="hints-hub-slot-item-info">
+              <strong class="text-accent hints-hub-slot-rank">#${r}</strong>
+              <span class="hints-hub-slot-name">${this.escapeHtml(slot.item || "Secret Pick")}</span>
+              <span class="mono text-secondary hints-hub-slot-pts">(${r} pts)</span>
               ${targetBadge}
             </div>
-            <div id="hints-hub-slot-status-${r}">${activeHintBadge}</div>
+            <div id="hints-hub-slot-status-${r}" class="hints-hub-slot-status">${activeHintBadge}</div>
           </div>
-          <div class="hints-hub-actions-row">
+
+          <!-- Row 2: [ 1st Letter ] and [ Length ] side-by-side (grid 1fr 1fr) -->
+          <div class="hints-hub-slot-row2">
             <button type="button" class="btn btn-hint-quick btn-hh-first-letter" data-rank="${r}">[ 1st Letter ]</button>
             <button type="button" class="btn btn-hint-quick btn-hh-length" data-rank="${r}">[ Length ]</button>
-            <div class="hints-hub-custom-wrap">
-              <input type="text" class="input-hints-hub-custom" placeholder="Custom clue (max 35 chars)..." maxlength="35" data-rank="${r}">
-              <button type="button" class="btn btn-primary btn-hints-hub-send" data-rank="${r}">Send</button>
-            </div>
+          </div>
+
+          <!-- Row 3: Compact custom clue input (16px font-size, 36px height) + Send button -->
+          <div class="hints-hub-slot-row3">
+            <input type="text" class="input-hints-hub-custom" placeholder="Custom clue (max 35 chars)..." maxlength="35" data-rank="${r}">
+            <button type="button" class="btn btn-primary btn-hints-hub-send" data-rank="${r}">Send</button>
           </div>
         `;
 
@@ -2512,10 +2651,7 @@ class GameController {
       this.modalGiveHint.classList.remove("open");
       this.modalGiveHint.classList.add("hidden");
     }
-    if (this.modalHintsHub) {
-      this.modalHintsHub.classList.remove("open");
-      this.modalHintsHub.classList.add("hidden");
-    }
+    this.closeHintsHubModalRaw();
 
     const notifMsg = isResponding
       ? `${this.myPlayerName} accepted and dropped a hint for #${rank}!`
