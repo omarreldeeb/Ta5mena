@@ -1470,6 +1470,141 @@ header.app-header {
   border: 2px solid var(--border-strong);
 }
 
+/* ============================================================================
+   TWO-TAB HINTS MODAL (REQUEST HINT VS GIVE HINT)
+   ============================================================================ */
+
+.hints-tab-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.hints-tab-btn {
+  flex: 1;
+  height: 36px;
+  background: #191919;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hints-tab-btn:hover {
+  color: #FFFFFF;
+  border-color: var(--border-strong);
+  background: #222222;
+}
+
+.hints-tab-btn.active {
+  background: #FFD700;
+  color: #111111;
+  border-color: #FFD700;
+  font-weight: 900;
+}
+
+.hints-tab-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.hint-step-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hint-request-opponents-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hint-req-opponent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #181818;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hint-req-opponent-btn:hover {
+  background: #242424;
+  border-color: var(--border-strong);
+}
+
+.hint-req-opponent-btn.selected {
+  background: rgba(255, 77, 0, 0.15);
+  border-color: var(--accent);
+  color: #FFFFFF;
+  box-shadow: 0 0 10px rgba(255, 77, 0, 0.25);
+}
+
+.hint-request-slots-grid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hint-req-slot-btn {
+  padding: 6px 10px;
+  background: #181818;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hint-req-slot-btn:hover {
+  border-color: #FFD700;
+  color: #FFFFFF;
+}
+
+.hint-req-slot-btn.selected {
+  background: #FFD700;
+  color: #111111;
+  border-color: #FFD700;
+  font-weight: 900;
+}
+
+.hints-hub-slot-card.is-requested-target {
+  border-color: #FFD700 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+  animation: pulseHintBorder 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes pulseHintBorder {
+  from { border-color: #FFD700; }
+  to { border-color: #FF9900; }
+}
+
 .hints-hub-slot-card {
   background-color: #161616;
   border: 1px solid #2A2A2A;

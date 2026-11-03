@@ -696,7 +696,7 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- VIEW: HINTS HUB MODAL (10 SLOTS WITH 3 QUICK ONE-TAP BUTTONS) -->
+    <!-- VIEW: HINTS HUB MODAL (TWO TABS: REQUEST A HINT & GIVE MY OWN HINT) -->
     <!-- ===================================================================== -->
     <div id="modal-hints-hub" class="modal-backdrop hidden">
       <div class="confirm-modal-box hints-modal-box" style="max-width: 680px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
@@ -710,24 +710,124 @@
             <div>
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">HINTS HUB</span>
-                <span class="mono text-secondary" style="font-size: 11px;">DROP CLUES</span>
+                <span id="hints-hub-status-badge" class="mono text-secondary" style="font-size: 11px;">ACTIVE TURN</span>
               </div>
-              <h3 style="font-size: 15px; margin-top: 2px;">Broadcast Clues for Your 10 Picks</h3>
+              <h3 id="hints-hub-title" style="font-size: 15px; margin-top: 2px;">Request or Give Clues</h3>
             </div>
           </div>
           <button id="btn-close-hints-hub" type="button" class="btn btn-sm">Close</button>
         </div>
 
-        <p class="text-secondary" style="font-size: 12px; margin: 8px 0 10px 0; flex-shrink: 0;">
-          Select any unguessed slot below to broadcast an instant hint to all players on the main board!
-        </p>
+        <!-- 2 TABS -->
+        <div class="hints-tab-bar mt-12 mb-12">
+          <button id="btn-tab-hint-request" type="button" class="hints-tab-btn active">
+            REQUEST A HINT
+          </button>
+          <button id="btn-tab-hint-give" type="button" class="hints-tab-btn">
+            GIVE MY OWN HINT
+          </button>
+        </div>
 
-        <div id="hints-hub-slots-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
-          <!-- Dynamically populated 10 slots -->
+        <!-- TAB 1: REQUEST A HINT (DEFAULT) -->
+        <div id="hints-tab-request-pane" class="hints-tab-pane">
+          <p class="text-secondary mb-12" style="font-size: 12px; margin-bottom: 10px;">
+            Ask an opponent for a clue before submitting your guess!
+          </p>
+
+          <div class="hint-request-section mb-12" style="margin-bottom: 12px;">
+            <label class="hint-step-label">1. SELECT OPPONENT</label>
+            <div id="hint-request-opponents-grid" class="hint-request-opponents-grid">
+              <!-- Dynamically populated buttons for opponents with hidden slots -->
+            </div>
+          </div>
+
+          <div class="hint-request-section mb-12" style="margin-bottom: 14px;">
+            <label class="hint-step-label">2. SELECT SLOT TO ASK ABOUT</label>
+            <div id="hint-request-slots-grid" class="hint-request-slots-grid">
+              <!-- Dynamically populated slot buttons: [ ANY HIDDEN SLOT ] + #10, #9, etc. -->
+            </div>
+          </div>
+
+          <div style="margin-top: 6px;">
+            <button id="btn-send-hint-request" type="button" class="btn btn-primary btn-block" style="height: 42px; font-weight: 800; font-size: 13px;">
+              SEND HINT REQUEST
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: GIVE MY OWN HINT -->
+        <div id="hints-tab-give-pane" class="hints-tab-pane hidden">
+          <p class="text-secondary" style="font-size: 12px; margin-bottom: 10px; flex-shrink: 0;">
+            Select any unguessed slot below to broadcast an instant hint to all players on the main board!
+          </p>
+
+          <div id="hints-hub-slots-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; max-height: 52vh;">
+            <!-- Dynamically populated 10 slots -->
+          </div>
         </div>
 
         <div style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 10px; display: flex; justify-content: flex-end; flex-shrink: 0;">
           <button id="btn-dismiss-hints-hub" type="button" class="btn btn-sm">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: INCOMING HINT REQUEST MODAL (ONLINE MULTIPLAYER) -->
+    <!-- ===================================================================== -->
+    <div id="modal-incoming-hint-request" class="modal-backdrop hidden">
+      <div class="confirm-modal-box sharp-modal-box" style="max-width: 440px;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">💡 HINT REQUEST</span>
+            <span class="mono text-secondary" style="font-size: 11px;">INCOMING</span>
+          </div>
+        </div>
+        <div style="margin: 12px 0;">
+          <h3 id="incoming-hint-request-title" style="font-size: 16px; font-weight: 800; line-height: 1.3; color: #FFFFFF;">
+            Player requested a hint from you!
+          </h3>
+          <p id="incoming-hint-request-desc" class="text-secondary" style="font-size: 13px; line-height: 1.4; margin-top: 6px;">
+            They are asking for a clue before submitting their turn guess.
+          </p>
+        </div>
+        <div class="flex-between gap-8 mt-12" style="display: flex; gap: 8px; margin-top: 14px;">
+          <button id="btn-decline-hint-request" type="button" class="btn btn-danger-outline" style="flex: 1;">
+            DECLINE REQUEST
+          </button>
+          <button id="btn-accept-hint-request" type="button" class="btn btn-primary" style="flex: 1.2; font-weight: 700;">
+            GIVE HINT
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW: PASS & PLAY HINT REQUEST PROMPT (1-DEVICE MODE) -->
+    <!-- ===================================================================== -->
+    <div id="modal-local-hint-request" class="modal-backdrop hidden">
+      <div class="confirm-modal-box sharp-modal-box" style="max-width: 440px;">
+        <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="badge badge-accent" style="font-weight: 800;">PASS & PLAY</span>
+            <span class="mono text-secondary" style="font-size: 11px;">HINT REQUEST</span>
+          </div>
+        </div>
+        <div style="margin: 12px 0;">
+          <h3 id="local-hint-request-title" style="font-size: 16px; font-weight: 800; line-height: 1.3; color: #FFFFFF;">
+            Player 1 requested a hint from Player 2!
+          </h3>
+          <p id="local-hint-request-desc" class="text-secondary" style="font-size: 13px; line-height: 1.4; margin-top: 6px;">
+            Pass the phone to Player 2 to give a secret hint, or decline the request.
+          </p>
+        </div>
+        <div class="flex-between gap-8 mt-12" style="display: flex; gap: 8px; margin-top: 14px;">
+          <button id="btn-local-decline-hint" type="button" class="btn btn-danger-outline" style="flex: 1;">
+            DECLINE
+          </button>
+          <button id="btn-local-accept-hint" type="button" class="btn btn-primary" style="flex: 1.4; font-weight: 700; font-size: 13px;">
+            PASS TO GIVE HINT
+          </button>
         </div>
       </div>
     </div>

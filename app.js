@@ -300,6 +300,18 @@ class GameController {
     this.toastFadeTimeout = null;
     this.lastSeenActionTimestamp = Date.now() - 3000;
 
+    // Hints Hub and Hint Request state
+    this.activeHintHubTab = "request";
+    this.hintRequestOpponentId = null;
+    this.hintRequestSlot = "any";
+    this.isRespondingToHintRequest = false;
+    this.requestedHintSlot = null;
+    this.pendingIncomingHintRequest = null;
+    this.lastHandledHintRequestTimestamp = 0;
+    this.isLocalHintResponse = false;
+    this.localHintOriginPlayerId = null;
+    this.pendingLocalHintRequest = null;
+
     // 1-Device Pass & Play (Local Multiplayer) state
     this.isLocalMode = false;
     this.localMatch = null;
@@ -341,11 +353,34 @@ class GameController {
     this.floatingToastProgress = document.getElementById("floating-toast-progress");
     this.btnCloseAlert = document.getElementById("btn-floating-toast-close") || document.getElementById("btn-close-alert");
 
-    // Hints Hub Modal
+    // Hints Hub Modal and Tabs
     this.modalHintsHub = document.getElementById("modal-hints-hub");
     this.hintsHubSlotsList = document.getElementById("hints-hub-slots-list");
     this.btnCloseHintsHub = document.getElementById("btn-close-hints-hub");
     this.btnDismissHintsHub = document.getElementById("btn-dismiss-hints-hub");
+    this.btnTabHintRequest = document.getElementById("btn-tab-hint-request");
+    this.btnTabHintGive = document.getElementById("btn-tab-hint-give");
+    this.hintsTabRequestPane = document.getElementById("hints-tab-request-pane");
+    this.hintsTabGivePane = document.getElementById("hints-tab-give-pane");
+    this.hintRequestOpponentsGrid = document.getElementById("hint-request-opponents-grid");
+    this.hintRequestSlotsGrid = document.getElementById("hint-request-slots-grid");
+    this.btnSendHintRequest = document.getElementById("btn-send-hint-request");
+    this.hintsHubStatusBadge = document.getElementById("hints-hub-status-badge");
+    this.hintsHubTitle = document.getElementById("hints-hub-title");
+
+    // Incoming Hint Request Modal (Online Multiplayer)
+    this.modalIncomingHintRequest = document.getElementById("modal-incoming-hint-request");
+    this.incomingHintRequestTitle = document.getElementById("incoming-hint-request-title");
+    this.incomingHintRequestDesc = document.getElementById("incoming-hint-request-desc");
+    this.btnAcceptHintRequest = document.getElementById("btn-accept-hint-request");
+    this.btnDeclineHintRequest = document.getElementById("btn-decline-hint-request");
+
+    // Local Pass & Play Hint Request Modal (1-Device Mode)
+    this.modalLocalHintRequest = document.getElementById("modal-local-hint-request");
+    this.localHintRequestTitle = document.getElementById("local-hint-request-title");
+    this.localHintRequestDesc = document.getElementById("local-hint-request-desc");
+    this.btnLocalAcceptHint = document.getElementById("btn-local-accept-hint");
+    this.btnLocalDeclineHint = document.getElementById("btn-local-decline-hint");
 
     // Reusable Sharp Confirmation Modal
     this.modalConfirm = document.getElementById("modal-confirm");
@@ -582,18 +617,9 @@ class GameController {
       }
     });
 
-    // Hints Hub Header Button & Modal Toggle
+    // Hints Hub Header Button and Modal Toggle
     this.btnHeaderHints?.addEventListener("click", () => {
-      if (this.isLocalMode) {
-        const activeName = this.localMatch?.players?.[this.myPlayerId]?.name || "Active Player";
-        this.showLocalRevealConfirm(
-          "PROTECTED HINTS",
-          `Show hints for ${activeName}'s secret list? Make sure others aren't looking!`,
-          () => this.openHintsHubModal()
-        );
-      } else {
-        this.openHintsHubModal();
-      }
+      this.openHintsHubModal("request");
     });
     this.btnCloseHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
     this.btnDismissHintsHub?.addEventListener("click", () => this.closeHintsHubModal());
@@ -602,6 +628,19 @@ class GameController {
         this.closeHintsHubModal();
       }
     });
+
+    // Hints Modal Tabs and Send Request
+    this.btnTabHintRequest?.addEventListener("click", () => this.switchHintsTab("request"));
+    this.btnTabHintGive?.addEventListener("click", () => this.switchHintsTab("give"));
+    this.btnSendHintRequest?.addEventListener("click", () => this.handleSendHintRequest());
+
+    // Online Incoming Hint Request Modal Buttons
+    this.btnAcceptHintRequest?.addEventListener("click", () => this.handleAcceptIncomingHintRequest());
+    this.btnDeclineHintRequest?.addEventListener("click", () => this.handleDeclineIncomingHintRequest());
+
+    // Local Pass & Play Hint Request Modal Buttons
+    this.btnLocalAcceptHint?.addEventListener("click", () => this.handleLocalAcceptHintRequest());
+    this.btnLocalDeclineHint?.addEventListener("click", () => this.handleLocalDeclineHintRequest());
 
     // My List Drawer Toggle
     this.btnHeaderMyList?.addEventListener("click", () => {
@@ -1514,12 +1553,21 @@ class GameController {
     this.modalMyList?.classList.remove("open");
     this.modalMyList?.classList.add("hidden");
     if (this.modalHintsHub) { this.modalHintsHub.classList.remove("open"); this.modalHintsHub.classList.add("hidden"); }
+    if (this.modalIncomingHintRequest) { this.modalIncomingHintRequest.classList.remove("open"); this.modalIncomingHintRequest.classList.add("hidden"); }
+    if (this.modalLocalHintRequest) { this.modalLocalHintRequest.classList.remove("open"); this.modalLocalHintRequest.classList.add("hidden"); }
     if (this.modalConfirmation) { this.modalConfirmation.classList.remove("open"); this.modalConfirmation.classList.add("hidden"); }
     if (this.waitingConfirmationBackdrop) { this.waitingConfirmationBackdrop.classList.remove("open"); this.waitingConfirmationBackdrop.classList.add("hidden"); }
     if (this.modalPrivacyCurtain) { this.modalPrivacyCurtain.classList.remove("open"); this.modalPrivacyCurtain.classList.add("hidden"); }
     if (this.modalLocalRevealConfirm) { this.modalLocalRevealConfirm.classList.remove("open"); this.modalLocalRevealConfirm.classList.add("hidden"); }
     if (this.modalLocalVerifyChoice) { this.modalLocalVerifyChoice.classList.remove("open"); this.modalLocalVerifyChoice.classList.add("hidden"); }
     if (this.modalLocalSecretTargetSlots) { this.modalLocalSecretTargetSlots.classList.remove("open"); this.modalLocalSecretTargetSlots.classList.add("hidden"); }
+    this.pendingIncomingHintRequest = null;
+    this.pendingLocalHintRequest = null;
+    this.isRespondingToHintRequest = false;
+    this.isLocalHintResponse = false;
+    this.localHintOriginPlayerId = null;
+    this.requestedHintSlot = null;
+    this.lastHandledHintRequestTimestamp = 0;
     this.hidePauseOverlay();
     this.closeGiveHintModal();
     this.closeHintsHubModal();
@@ -1652,6 +1700,9 @@ class GameController {
 
       // Check if any opponent dropped hints
       this.checkForNewHints(room);
+
+      // Check incoming hint request (Online Multiplayer)
+      this.checkIncomingHintRequest(room);
 
       this.updateMyListButtonVisibility(room);
       this.routeRoomState(room);
@@ -1797,19 +1848,30 @@ class GameController {
     });
   }
 
-  openHintsHubModal() {
-    if (!this.roomData || !this.roomData.lists || !this.myPlayerId) {
+  openHintsHubModal(defaultTab = "request") {
+    const isOnline = !this.isLocalMode;
+    const room = isOnline ? this.roomData : this.localMatch;
+    if (!room || !room.lists || !this.myPlayerId) {
       this.showAlert("Waiting for game list data...");
       return;
     }
-    const isPlaying = (this.roomData.meta?.status === "playing");
-    const activePlayerId = this.roomData.game?.activePlayerId || (this.roomData.game?.turnOrder ? this.roomData.game.turnOrder[this.roomData.game.currentTurnIndex || 0] : null);
+    const isPlaying = (room.meta?.status === "playing");
+    const activePlayerId = room.game?.activePlayerId || (room.game?.turnOrder ? room.game.turnOrder[room.game.currentTurnIndex || 0] : null);
     const isMyTurn = (isPlaying && activePlayerId === this.myPlayerId);
-    if (!isMyTurn) {
-      this.showAlert("You can only drop hints during your turn!");
+    if (!isMyTurn && !this.isRespondingToHintRequest) {
+      this.showAlert("You can only drop hints during your turn or when responding to a hint request!");
       return;
     }
-    this.renderHintsHubSlots();
+
+    // If responding to an incoming request, force tab 2 'give'
+    const chosenTab = this.isRespondingToHintRequest ? "give" : defaultTab;
+    this.switchHintsTab(chosenTab);
+
+    if (this.hintsHubStatusBadge) {
+      this.hintsHubStatusBadge.textContent = this.isRespondingToHintRequest ? "INCOMING REQUEST" : "ACTIVE TURN";
+      this.hintsHubStatusBadge.style.color = this.isRespondingToHintRequest ? "var(--accent)" : "#FFD700";
+    }
+
     if (this.modalHintsHub) {
       this.modalHintsHub.classList.remove("hidden");
       this.modalHintsHub.classList.add("open");
@@ -1821,12 +1883,377 @@ class GameController {
       this.modalHintsHub.classList.remove("open");
       this.modalHintsHub.classList.add("hidden");
     }
+    if (this.hintsHubStatusBadge) {
+      this.hintsHubStatusBadge.textContent = "ACTIVE TURN";
+      this.hintsHubStatusBadge.style.color = "";
+    }
+
+    if (this.isLocalHintResponse) {
+      // In 1-Device Pass & Play, if closed without giving hint, return phone to turn player
+      const originId = this.localHintOriginPlayerId;
+      const originName = this.localMatch?.players?.[originId]?.name || "Turn Player";
+      this.myPlayerId = originId;
+      this.isRespondingToHintRequest = false;
+      this.isLocalHintResponse = false;
+      this.localHintOriginPlayerId = null;
+      this.requestedHintSlot = null;
+      this.pendingLocalHintRequest = null;
+      this.showPrivacyCurtain(
+        originName,
+        "Resuming turn. Make sure only the active player sees the screen.",
+        () => {
+          this.renderBoardSlots(this.localMatch);
+          this.updateMyListButtonVisibility(this.localMatch);
+        }
+      );
+    } else if (this.isRespondingToHintRequest) {
+      this.isRespondingToHintRequest = false;
+      this.requestedHintSlot = null;
+      this.pendingIncomingHintRequest = null;
+    }
+  }
+
+  switchHintsTab(tabName) {
+    this.activeHintHubTab = tabName;
+    if (this.btnTabHintRequest) {
+      this.btnTabHintRequest.classList.toggle("active", tabName === "request");
+    }
+    if (this.btnTabHintGive) {
+      this.btnTabHintGive.classList.toggle("active", tabName === "give");
+    }
+    if (this.hintsTabRequestPane) {
+      this.hintsTabRequestPane.classList.toggle("hidden", tabName !== "request");
+    }
+    if (this.hintsTabGivePane) {
+      this.hintsTabGivePane.classList.toggle("hidden", tabName !== "give");
+    }
+
+    if (tabName === "request") {
+      this.renderHintRequestPane();
+    } else {
+      this.renderHintsHubSlots();
+    }
+  }
+
+  renderHintRequestPane() {
+    const isOnline = !this.isLocalMode;
+    const room = isOnline ? this.roomData : this.localMatch;
+    if (!room || !room.players || !room.lists || !this.myPlayerId) return;
+
+    const allPlayers = Object.values(room.players || {});
+    const lists = room.lists || {};
+
+    // Filter opponents who still have hidden slots
+    const opponentsWithHidden = allPlayers.filter(p => {
+      if (p.id === this.myPlayerId) return false;
+      if (isOnline && p.connected === false) return false;
+      return !this.isPlayerListCompleted(p.id, lists);
+    });
+
+    if (!this.hintRequestOpponentsGrid || !this.hintRequestSlotsGrid) return;
+    this.hintRequestOpponentsGrid.innerHTML = "";
+    this.hintRequestSlotsGrid.innerHTML = "";
+
+    if (opponentsWithHidden.length === 0) {
+      this.hintRequestOpponentsGrid.innerHTML = `
+        <div class="text-secondary" style="font-size: 12px; padding: 8px 0;">
+          All opponents' lists are fully revealed! No hints can be requested.
+        </div>
+      `;
+      if (this.btnSendHintRequest) {
+        this.btnSendHintRequest.disabled = true;
+      }
+      return;
+    }
+
+    if (this.btnSendHintRequest) {
+      this.btnSendHintRequest.disabled = false;
+    }
+
+    if (!this.hintRequestOpponentId || !opponentsWithHidden.some(p => p.id === this.hintRequestOpponentId)) {
+      this.hintRequestOpponentId = opponentsWithHidden[0].id;
+    }
+
+    opponentsWithHidden.forEach(opp => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn hint-req-opponent-btn" + (opp.id === this.hintRequestOpponentId ? " selected" : "");
+      
+      const oppList = lists[opp.id] || {};
+      let hiddenCount = 0;
+      for (let r = 1; r <= 10; r++) {
+        if (!oppList[r] || !oppList[r].revealed) hiddenCount++;
+      }
+
+      btn.innerHTML = `
+        <span style="font-weight: 700;">${this.escapeHtml(opp.name)}</span>
+        <span class="mono text-secondary" style="font-size: 11px;">(${hiddenCount} hidden)</span>
+      `;
+      btn.addEventListener("click", () => {
+        this.hintRequestOpponentId = opp.id;
+        this.renderHintRequestPane();
+      });
+      this.hintRequestOpponentsGrid.appendChild(btn);
+    });
+
+    const selectedOppList = lists[this.hintRequestOpponentId] || {};
+    const hiddenSlots = [];
+    for (let r = 10; r >= 1; r--) {
+      if (!selectedOppList[r] || !selectedOppList[r].revealed) {
+        hiddenSlots.push(r);
+      }
+    }
+
+    if (this.hintRequestSlot !== "any" && !hiddenSlots.includes(Number(this.hintRequestSlot))) {
+      this.hintRequestSlot = "any";
+    }
+
+    const anyBtn = document.createElement("button");
+    anyBtn.type = "button";
+    anyBtn.className = "btn hint-req-slot-btn" + (this.hintRequestSlot === "any" ? " selected" : "");
+    anyBtn.innerHTML = `<span>ANY HIDDEN SLOT</span>`;
+    anyBtn.addEventListener("click", () => {
+      this.hintRequestSlot = "any";
+      this.updateHintRequestSlotSelection();
+    });
+    this.hintRequestSlotsGrid.appendChild(anyBtn);
+
+    hiddenSlots.forEach(r => {
+      const slotBtn = document.createElement("button");
+      slotBtn.type = "button";
+      slotBtn.className = "btn hint-req-slot-btn" + (Number(this.hintRequestSlot) === r ? " selected" : "");
+      slotBtn.setAttribute("data-rank", r);
+      slotBtn.innerHTML = `
+        <strong>#${r}</strong>
+        <span class="mono text-secondary" style="font-size: 10px;">${r}pts</span>
+      `;
+      slotBtn.addEventListener("click", () => {
+        this.hintRequestSlot = r;
+        this.updateHintRequestSlotSelection();
+      });
+      this.hintRequestSlotsGrid.appendChild(slotBtn);
+    });
+  }
+
+  updateHintRequestSlotSelection() {
+    if (!this.hintRequestSlotsGrid) return;
+    const buttons = this.hintRequestSlotsGrid.querySelectorAll(".hint-req-slot-btn");
+    buttons.forEach(btn => {
+      const rankAttr = btn.getAttribute("data-rank");
+      if (!rankAttr) {
+        btn.classList.toggle("selected", this.hintRequestSlot === "any");
+      } else {
+        btn.classList.toggle("selected", Number(this.hintRequestSlot) === Number(rankAttr));
+      }
+    });
+  }
+
+  async handleSendHintRequest() {
+    const isOnline = !this.isLocalMode;
+    const room = isOnline ? this.roomData : this.localMatch;
+    if (!room || !room.players) return;
+
+    if (!this.hintRequestOpponentId) {
+      this.showAlert("Please select an opponent to ask for a hint.");
+      return;
+    }
+
+    const targetPlayer = room.players[this.hintRequestOpponentId];
+    if (!targetPlayer) {
+      this.showAlert("Selected opponent is not valid.");
+      return;
+    }
+
+    const requestedSlot = this.hintRequestSlot;
+    const targetName = targetPlayer.name || "Opponent";
+    const slotDesc = (requestedSlot === "any") ? "any hidden slot" : `slot #${requestedSlot}`;
+
+    if (this.isLocalMode) {
+      this.closeHintsHubModal();
+      this.pendingLocalHintRequest = {
+        fromPlayerId: this.myPlayerId,
+        fromPlayerName: this.myPlayerName,
+        targetPlayerId: this.hintRequestOpponentId,
+        targetPlayerName: targetName,
+        requestedSlot: requestedSlot,
+        timestamp: Date.now()
+      };
+      this.openLocalHintRequestModal(this.pendingLocalHintRequest);
+      return;
+    }
+
+    if (!this.currentRoomCode) return;
+    const hintRequestObj = {
+      fromPlayerId: this.myPlayerId,
+      fromPlayerName: this.myPlayerName,
+      targetPlayerId: this.hintRequestOpponentId,
+      targetPlayerName: targetName,
+      requestedSlot: requestedSlot,
+      timestamp: Date.now(),
+      status: "pending"
+    };
+
+    const updates = {};
+    updates["hintRequest"] = hintRequestObj;
+    updates["game/lastAction"] = {
+      text: `${this.myPlayerName} requested a hint from ${targetName}!`,
+      type: "hint",
+      timestamp: Date.now()
+    };
+    updates["lastActivity"] = Date.now();
+
+    await db.update(`rooms/${this.currentRoomCode}`, updates);
+    this.closeHintsHubModal();
+    this.showFloatingNotification(`Hint requested from ${targetName} for ${slotDesc}!`, "hint");
+  }
+
+  checkIncomingHintRequest(room) {
+    if (this.isLocalMode) return;
+    if (!room || !this.myPlayerId) return;
+
+    const req = room.hintRequest;
+    if (!req || req.status !== "pending") {
+      if (this.modalIncomingHintRequest && !this.modalIncomingHintRequest.classList.contains("hidden")) {
+        this.closeIncomingHintRequestModal();
+      }
+      return;
+    }
+
+    // Only target player should see this modal
+    if (req.targetPlayerId !== this.myPlayerId) {
+      if (this.modalIncomingHintRequest && !this.modalIncomingHintRequest.classList.contains("hidden")) {
+        this.closeIncomingHintRequestModal();
+      }
+      return;
+    }
+
+    if (this.lastHandledHintRequestTimestamp === req.timestamp) {
+      return;
+    }
+
+    this.pendingIncomingHintRequest = req;
+    this.openIncomingHintRequestModal(req);
+  }
+
+  openIncomingHintRequestModal(req) {
+    if (!this.modalIncomingHintRequest) return;
+    if (this.incomingHintRequestTitle) {
+      this.incomingHintRequestTitle.textContent = `${req.fromPlayerName || "An opponent"} requested a hint from you!`;
+    }
+    if (this.incomingHintRequestDesc) {
+      if (req.requestedSlot && req.requestedSlot !== "any") {
+        this.incomingHintRequestDesc.textContent = `Requested for your #${req.requestedSlot} slot. Would you like to drop a clue on the board?`;
+      } else {
+        this.incomingHintRequestDesc.textContent = "They are asking for a clue on any hidden slot before making their guess.";
+      }
+    }
+    this.modalIncomingHintRequest.classList.remove("hidden");
+    this.modalIncomingHintRequest.classList.add("open");
+  }
+
+  closeIncomingHintRequestModal() {
+    if (this.modalIncomingHintRequest) {
+      this.modalIncomingHintRequest.classList.remove("open");
+      this.modalIncomingHintRequest.classList.add("hidden");
+    }
+  }
+
+  async handleDeclineIncomingHintRequest() {
+    const req = this.pendingIncomingHintRequest || this.roomData?.hintRequest;
+    this.lastHandledHintRequestTimestamp = req?.timestamp || Date.now();
+    this.closeIncomingHintRequestModal();
+    this.pendingIncomingHintRequest = null;
+
+    if (!this.currentRoomCode || !req) return;
+    const updates = {};
+    updates["hintRequest"] = null;
+    updates["game/lastAction"] = {
+      text: `${this.myPlayerName} declined ${req.fromPlayerName}'s hint request!`,
+      type: "general",
+      timestamp: Date.now()
+    };
+    updates["lastActivity"] = Date.now();
+    await db.update(`rooms/${this.currentRoomCode}`, updates);
+    this.showFloatingNotification("You declined the hint request.", "general");
+  }
+
+  async handleAcceptIncomingHintRequest() {
+    const req = this.pendingIncomingHintRequest || this.roomData?.hintRequest;
+    this.lastHandledHintRequestTimestamp = req?.timestamp || Date.now();
+    this.closeIncomingHintRequestModal();
+
+    if (!req) return;
+    this.isRespondingToHintRequest = true;
+    this.requestedHintSlot = req.requestedSlot;
+    this.openHintsHubModal("give");
+  }
+
+  openLocalHintRequestModal(req) {
+    if (!this.modalLocalHintRequest) return;
+    if (this.localHintRequestTitle) {
+      this.localHintRequestTitle.textContent = `${req.fromPlayerName} requested a hint from ${req.targetPlayerName}!`;
+    }
+    if (this.localHintRequestDesc) {
+      if (req.requestedSlot && req.requestedSlot !== "any") {
+        this.localHintRequestDesc.textContent = `Pass the phone to ${req.targetPlayerName} to give a secret hint for their #${req.requestedSlot} slot, or decline the request.`;
+      } else {
+        this.localHintRequestDesc.textContent = `Pass the phone to ${req.targetPlayerName} to give a secret hint on any hidden slot, or decline the request.`;
+      }
+    }
+    this.modalLocalHintRequest.classList.remove("hidden");
+    this.modalLocalHintRequest.classList.add("open");
+  }
+
+  closeLocalHintRequestModal() {
+    if (this.modalLocalHintRequest) {
+      this.modalLocalHintRequest.classList.remove("open");
+      this.modalLocalHintRequest.classList.add("hidden");
+    }
+  }
+
+  handleLocalDeclineHintRequest() {
+    const req = this.pendingLocalHintRequest;
+    this.closeLocalHintRequestModal();
+    this.pendingLocalHintRequest = null;
+    if (!req) return;
+
+    this.localMatch.game.lastAction = {
+      text: `${req.targetPlayerName} declined ${req.fromPlayerName}'s hint request!`,
+      type: "general",
+      timestamp: Date.now()
+    };
+    this.saveLocalMatch(this.localMatch);
+    this.showFloatingNotification(`${req.targetPlayerName} declined ${req.fromPlayerName}'s hint request!`, "general");
+  }
+
+  handleLocalAcceptHintRequest() {
+    const req = this.pendingLocalHintRequest;
+    this.closeLocalHintRequestModal();
+    if (!req) return;
+
+    const targetName = req.targetPlayerName;
+    const originName = req.fromPlayerName;
+
+    this.showPrivacyCurtain(
+      targetName,
+      `${originName} requested a hint! Make sure only ${targetName} sees the secret list.`,
+      () => {
+        this.localHintOriginPlayerId = req.fromPlayerId;
+        this.isRespondingToHintRequest = true;
+        this.isLocalHintResponse = true;
+        this.myPlayerId = req.targetPlayerId;
+        this.requestedHintSlot = req.requestedSlot;
+        this.openHintsHubModal("give");
+      }
+    );
   }
 
   renderHintsHubSlots() {
-    if (!this.roomData || !this.roomData.lists || !this.myPlayerId) return;
-    const myList = this.roomData.lists[this.myPlayerId] || {};
-    const myHints = this.roomData.players?.[this.myPlayerId]?.hints || {};
+    const isOnline = !this.isLocalMode;
+    const room = isOnline ? this.roomData : this.localMatch;
+    if (!room || !room.lists || !this.myPlayerId) return;
+    const myList = room.lists[this.myPlayerId] || {};
+    const myHints = room.players?.[this.myPlayerId]?.hints || {};
 
     if (!this.hintsHubSlotsList) return;
     this.hintsHubSlotsList.innerHTML = "";
@@ -1836,8 +2263,12 @@ class GameController {
     for (let r = 1; r <= 10; r++) {
       const slot = myList[r] || { item: "", revealed: false, points: r };
       const hint = myHints[r];
+      const isRequestedTarget = (this.requestedHintSlot && Number(this.requestedHintSlot) === r);
       const card = document.createElement("div");
-      card.className = "hints-hub-slot-card" + (slot.revealed ? " is-revealed" : "");
+      card.className = "hints-hub-slot-card" +
+        (slot.revealed ? " is-revealed" : "") +
+        (isRequestedTarget ? " is-requested-target" : "");
+      card.setAttribute("data-slot-rank", r);
 
       if (slot.revealed) {
         card.innerHTML = `
@@ -1855,12 +2286,17 @@ class GameController {
           ? `<span class="board-slot-hint-bright">${bulbSvg} 💡 HINT: ${this.escapeHtml(hint.text)}</span>`
           : `<span class="mono text-secondary" style="font-size: 11px;">NO HINT DROPPED</span>`;
 
+        const targetBadge = isRequestedTarget
+          ? `<span class="badge" style="background: rgba(255, 215, 0, 0.25); color: #FFD700; border: 1px solid #FFD700; font-weight: 800; font-size: 10px; margin-left: 6px;">🎯 REQUESTED TARGET</span>`
+          : "";
+
         card.innerHTML = `
           <div class="hints-hub-slot-header">
             <div>
               <strong class="text-accent" style="font-family: var(--font-mono); font-size: 13px;">#${r}</strong>
               <span style="font-weight: 700; margin-left: 6px; font-size: 13px;">${this.escapeHtml(slot.item || "Secret Pick")}</span>
               <span class="mono text-secondary" style="font-size: 11px; margin-left: 6px;">(${r} pts)</span>
+              ${targetBadge}
             </div>
             <div id="hints-hub-slot-status-${r}">${activeHintBadge}</div>
           </div>
@@ -1894,6 +2330,16 @@ class GameController {
       }
 
       this.hintsHubSlotsList.appendChild(card);
+    }
+
+    // If a specific slot was requested, scroll it smoothly into view
+    if (this.requestedHintSlot && Number(this.requestedHintSlot) >= 1 && Number(this.requestedHintSlot) <= 10) {
+      setTimeout(() => {
+        const targetEl = this.hintsHubSlotsList?.querySelector(`[data-slot-rank="${this.requestedHintSlot}"]`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
     }
   }
 
@@ -1932,7 +2378,7 @@ class GameController {
   }
 
   openGiveHintModal(rank, item) {
-    this.openHintsHubModal();
+    this.openHintsHubModal("give");
   }
 
   closeGiveHintModal() {
@@ -1976,44 +2422,108 @@ class GameController {
         this.localMatch.players[this.myPlayerId].hints = {};
       }
       this.localMatch.players[this.myPlayerId].hints[rank] = hintData;
-      this.localMatch.game.lastAction = {
-        text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
-        type: "hint",
-        timestamp: Date.now()
-      };
-      this.saveLocalMatch(this.localMatch);
-      this.closeGiveHintModal();
-      this.showFloatingNotification(`Hint broadcast for #${rank} pick: "${hintText}"`, "hint");
 
-      if (this.modalMyList?.classList.contains("open")) {
-        this.renderMyListDrawer();
+      const isLocalResponse = this.isLocalHintResponse;
+      const targetName = this.localMatch.players[this.myPlayerId]?.name || "Player";
+      const originId = this.localHintOriginPlayerId;
+      const originName = originId ? (this.localMatch.players[originId]?.name || "Turn Player") : null;
+
+      if (isLocalResponse) {
+        this.localMatch.game.lastAction = {
+          text: `${targetName} accepted and dropped a hint for #${rank}!`,
+          type: "hint",
+          timestamp: Date.now()
+        };
+      } else {
+        this.localMatch.game.lastAction = {
+          text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
+          type: "hint",
+          timestamp: Date.now()
+        };
       }
-      if (this.modalHintsHub?.classList.contains("open")) {
-        this.renderHintsHubSlots();
+      this.saveLocalMatch(this.localMatch);
+
+      if (this.modalGiveHint) {
+        this.modalGiveHint.classList.remove("open");
+        this.modalGiveHint.classList.add("hidden");
       }
-      this.renderBoardSlots(this.localMatch);
+      if (this.modalHintsHub) {
+        this.modalHintsHub.classList.remove("open");
+        this.modalHintsHub.classList.add("hidden");
+      }
+
+      const notifMsg = isLocalResponse
+        ? `${targetName} accepted and dropped a hint for #${rank}!`
+        : `Hint broadcast for #${rank} pick: "${hintText}"`;
+      this.showFloatingNotification(notifMsg, "hint");
+
+      if (isLocalResponse && originId) {
+        this.myPlayerId = originId;
+        this.isRespondingToHintRequest = false;
+        this.isLocalHintResponse = false;
+        this.localHintOriginPlayerId = null;
+        this.requestedHintSlot = null;
+        this.pendingLocalHintRequest = null;
+
+        this.showPrivacyCurtain(
+          originName,
+          `${targetName} dropped a clue on the board. Your turn to guess!`,
+          () => {
+            this.renderBoardSlots(this.localMatch);
+            this.updateMyListButtonVisibility(this.localMatch);
+          }
+        );
+      } else {
+        if (this.modalMyList?.classList.contains("open")) {
+          this.renderMyListDrawer();
+        }
+        this.renderBoardSlots(this.localMatch);
+      }
       return;
     }
 
     if (!this.currentRoomCode) return;
     const updates = {};
     updates[`players/${this.myPlayerId}/hints/${rank}`] = hintData;
-    updates[`game/lastAction`] = {
-      text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
-      type: "hint",
-      timestamp: Date.now()
-    };
+
+    const isResponding = this.isRespondingToHintRequest || (this.roomData?.hintRequest?.targetPlayerId === this.myPlayerId);
+    if (isResponding) {
+      updates["hintRequest"] = null;
+      updates["game/lastAction"] = {
+        text: `${this.myPlayerName} accepted and dropped a hint for #${rank}!`,
+        type: "hint",
+        timestamp: Date.now()
+      };
+    } else {
+      updates["game/lastAction"] = {
+        text: `${this.myPlayerName} dropped a hint for their #${rank} pick: ${hintText}`,
+        type: "hint",
+        timestamp: Date.now()
+      };
+    }
     updates["lastActivity"] = Date.now();
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
-    this.closeGiveHintModal();
-    this.showAlert(`Hint broadcast for #${rank} pick: "${hintText}"`, "hint");
+    this.isRespondingToHintRequest = false;
+    this.requestedHintSlot = null;
+    this.pendingIncomingHintRequest = null;
+
+    if (this.modalGiveHint) {
+      this.modalGiveHint.classList.remove("open");
+      this.modalGiveHint.classList.add("hidden");
+    }
+    if (this.modalHintsHub) {
+      this.modalHintsHub.classList.remove("open");
+      this.modalHintsHub.classList.add("hidden");
+    }
+
+    const notifMsg = isResponding
+      ? `${this.myPlayerName} accepted and dropped a hint for #${rank}!`
+      : `Hint broadcast for #${rank} pick: "${hintText}"`;
+    this.showFloatingNotification(notifMsg, "hint");
 
     if (this.modalMyList?.classList.contains("open")) {
       this.renderMyListDrawer();
-    }
-    if (this.modalHintsHub?.classList.contains("open")) {
-      this.renderHintsHubSlots();
     }
   }
 
@@ -2033,16 +2543,17 @@ class GameController {
     const activePlayerId = room.game?.activePlayerId || (room.game?.turnOrder ? room.game.turnOrder[room.game.currentTurnIndex || 0] : null);
     const isMyTurn = (isPlaying && activePlayerId === this.myPlayerId);
     this.btnHeaderHints?.classList.toggle("hidden", !isMyTurn);
-    if (!isMyTurn && this.modalHintsHub?.classList.contains("open")) {
+    if (!isMyTurn && !this.isRespondingToHintRequest && this.modalHintsHub?.classList.contains("open")) {
       this.closeHintsHubModal();
     }
 
-    // If modal is currently open, live update its slots
-    if (this.modalMyList?.classList.contains("open")) {
-      this.renderMyListDrawer();
-    }
-    if (isMyTurn && this.modalHintsHub?.classList.contains("open")) {
-      this.renderHintsHubSlots();
+    // If modal is currently open, live update its slots or requests
+    if (this.modalHintsHub?.classList.contains("open")) {
+      if (this.activeHintHubTab === "give") {
+        this.renderHintsHubSlots();
+      } else if (this.activeHintHubTab === "request") {
+        this.renderHintRequestPane();
+      }
     }
   }
 
