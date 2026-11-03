@@ -480,6 +480,9 @@ class GameController {
     // Pause Overlay Modal
     this.modalPauseOverlay = document.getElementById("modal-pause-overlay");
     this.pauseRoomCodeTag = document.getElementById("pause-room-code-tag");
+    this.pauseOverlayTitle = document.getElementById("pause-overlay-title");
+    this.pauseOverlayMessage = document.getElementById("pause-overlay-message");
+    this.pauseOverlaySubtitle = document.getElementById("pause-overlay-subtitle");
     this.pauseDisconnectedNames = document.getElementById("pause-disconnected-names");
     this.pauseHostActions = document.getElementById("pause-host-actions");
     this.pauseKickButtonsContainer = document.getElementById("pause-kick-buttons-container");
@@ -672,7 +675,7 @@ class GameController {
       if (this.currentRoomCode) {
         const isLobby = !this.roomData || !this.roomData.meta || this.roomData.meta.status === "lobby" || this.roomData.meta.status === "waiting";
         const players = this.roomData ? Object.values(this.roomData.players || {}) : [];
-        if (isLobby && (this.isHost || players.length <= 1)) {
+        if (isLobby && players.length <= 1) {
           try {
             navigator.sendBeacon(`https://ta5mena-default-rtdb.firebaseio.com/rooms/${this.currentRoomCode}.json?x-http-method-override=DELETE`);
           } catch (e) {}
@@ -1244,18 +1247,32 @@ class GameController {
 
     // Room is active (game started: "entry", "playing", "game_over"): check if saved playerId belongs to this room
     const savedPlayerId = localStorage.getItem("ta5mena_player_id");
+    const hostId = this.getRoomHostId(room);
+    const hostPlayer = hostId && room.players ? room.players[hostId] : null;
+
+    let seatPlayer = null;
     if (savedPlayerId && room.players && room.players[savedPlayerId]) {
+      seatPlayer = room.players[savedPlayerId];
+    } else if (hostPlayer && savedName && hostPlayer.name.trim().toLowerCase() === savedName.trim().toLowerCase()) {
+      seatPlayer = hostPlayer;
+    }
+
+    if (seatPlayer) {
       // Reconnect existing seat
-      const me = room.players[savedPlayerId];
-      this.myPlayerId = savedPlayerId;
+      const me = seatPlayer;
+      this.myPlayerId = me.id;
       this.myPlayerName = me.name;
       this.currentRoomCode = roomCodeFromUrl;
-      this.saveSession(savedPlayerId, me.name, roomCodeFromUrl);
+      this.saveSession(me.id, me.name, roomCodeFromUrl);
       this.reconnectBox.classList.add("hidden");
 
       await this.touchRoomActivity(roomCodeFromUrl);
-      await db.setPlayerConnected(roomCodeFromUrl, savedPlayerId, true);
-      await db.trackPlayerConnection(roomCodeFromUrl, savedPlayerId);
+      await db.update(`rooms/${roomCodeFromUrl}`, {
+        [`players/${me.id}/connected`]: true,
+        [`players/${me.id}/left`]: false,
+        lastActivity: Date.now()
+      });
+      await db.trackPlayerConnection(roomCodeFromUrl, me.id);
       this.subscribeToRoom(roomCodeFromUrl);
       this.showAlert(`Reconnected to room ${roomCodeFromUrl}!`);
     } else {
@@ -1320,6 +1337,11 @@ class GameController {
   // ROOM CREATION & JOINING
   // ==========================================================================
 
+  getRoomHostId(room = this.roomData) {
+    if (!room) return null;
+    return room.meta?.hostId || room.hostId || null;
+  }
+
   generateRoomCode() {
     const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // Strictly uppercase letters (no 0-9)
     let code = "";
@@ -1346,6 +1368,7 @@ class GameController {
 
     const initialRoom = {
       lastActivity: Date.now(),
+      hostId: playerId,
       meta: {
         code: roomCode,
         hostId: playerId,
@@ -1411,10 +1434,14 @@ class GameController {
     const savedPlayerId = localStorage.getItem("ta5mena_player_id");
     const existingPlayers = Object.values(room.players || {});
     const normInputName = name.trim().toLowerCase();
+    const hostId = this.getRoomHostId(room);
+    const hostPlayer = hostId && room.players ? room.players[hostId] : null;
 
-    // 1. Seat Rejoin / Reconnection (by unique saved token OR matching seat of player who left)
+    // 1. Seat Rejoin / Reconnection (prioritizing host seat if matching host name, or saved playerId, or matching seat name)
     let seatPlayer = null;
-    if (savedPlayerId && room.players && room.players[savedPlayerId]) {
+    if (hostPlayer && hostPlayer.name && hostPlayer.name.trim().toLowerCase() === normInputName) {
+      seatPlayer = hostPlayer;
+    } else if (savedPlayerId && room.players && room.players[savedPlayerId]) {
       seatPlayer = room.players[savedPlayerId];
     } else {
       seatPlayer = existingPlayers.find(p => p.name && p.name.trim().toLowerCase() === normInputName);
@@ -1583,50 +1610,42 @@ class GameController {
       try {
         const room = await db.get(`rooms/${roomCode}`);
         if (room && room.players) {
+          const hostId = this.getRoomHostId(room);
+          const isPlayerHost = (playerId === hostId);
           const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId && !p.left);
           const isLobby = !room.meta || room.meta.status === "lobby" || room.meta.status === "waiting";
-          if (remainingPlayers.length === 0 || (isLobby && (this.isHost || remainingPlayers.length <= 1))) {
-            // Delete room completely if empty or if left during solo lobby
+
+          if (remainingPlayers.length === 0 || (isLobby && isPlayerHost && remainingPlayers.length === 0)) {
+            // Delete room completely if empty
             await db.remove(`rooms/${roomCode}`);
           } else if (isLobby) {
             const updates = {};
             updates[`players/${playerId}`] = null;
             updates[`lists/${playerId}`] = null;
             updates[`lastActivity`] = Date.now();
-
-            // Host Migration: assign host to next connected player so room never becomes hostless
-            if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
-              const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
-              if (nextHost) {
-                updates[`players/${nextHost.id}/isHost`] = true;
-                updates[`meta/hostId`] = nextHost.id;
-                updates[`game/lastAction`] = {
-                  text: `${playerName} left the room. ${nextHost.name} is now the Host.`,
-                  timestamp: Date.now()
-                };
-              }
-            }
-
             await db.update(`rooms/${roomCode}`, updates);
           } else {
-            // In active match (playing or entry): preserve list so player can rejoin mid-game!
-            const updates = {};
-            updates[`players/${playerId}/left`] = true;
-            updates[`players/${playerId}/connected`] = false;
-            updates[`lastActivity`] = Date.now();
+            // In active match (playing or entry):
+            if (isPlayerHost) {
+              // Host left during active match or list entry:
+              // Do NOT delete the Host's player node, do NOT transfer host powers, and do NOT switch to 2-player rules or end the room.
+              // Simply set players/{hostId}/connected = false.
+              const updates = {};
+              updates[`players/${playerId}/connected`] = false;
+              updates[`lastActivity`] = Date.now();
+              await db.update(`rooms/${roomCode}`, updates);
+              // Do NOT call cleanUpDepartedPlayer for Host!
+            } else {
+              // Non-host player left: preserve list so player can rejoin mid-game!
+              const updates = {};
+              updates[`players/${playerId}/left`] = true;
+              updates[`players/${playerId}/connected`] = false;
+              updates[`lastActivity`] = Date.now();
+              await db.update(`rooms/${roomCode}`, updates);
 
-            if (this.isHost || (room.meta && room.meta.hostId === playerId)) {
-              const nextHost = remainingPlayers.find(p => p.connected === true) || remainingPlayers[0];
-              if (nextHost) {
-                updates[`players/${nextHost.id}/isHost`] = true;
-                updates[`meta/hostId`] = nextHost.id;
+              if (room.meta && room.meta.status === "playing") {
+                await this.cleanUpDepartedPlayer(playerId, playerName);
               }
-            }
-
-            await db.update(`rooms/${roomCode}`, updates);
-
-            if (room.meta && room.meta.status === "playing") {
-              await this.cleanUpDepartedPlayer(playerId, playerName);
             }
           }
         }
@@ -1672,21 +1691,9 @@ class GameController {
         return;
       }
 
-      // Host auto-migration safeguard if room has no valid host
-      const playersList = Object.values(room.players || {});
-      const hasHost = playersList.some(p => p.isHost === true) || (room.meta && room.players[room.meta.hostId]);
-      if (!hasHost && playersList.length > 0) {
-        const nextHost = playersList.find(p => p.connected === true) || playersList[0];
-        if (nextHost.id === this.myPlayerId) {
-          db.update(`rooms/${this.currentRoomCode}`, {
-            [`players/${this.myPlayerId}/isHost`]: true,
-            "meta/hostId": this.myPlayerId
-          });
-        }
-      }
-
-      this.isHost = me.isHost || (room.meta && room.meta.hostId === this.myPlayerId);
-      this.category = room.meta.category || "singers";
+      const hostId = this.getRoomHostId(room);
+      this.isHost = Boolean(hostId && this.myPlayerId === hostId);
+      this.category = room.meta?.category || "singers";
 
       // Check pause state: if any player has connected === false during match, show pause overlay
       this.checkGamePauseState(room);
@@ -1723,8 +1730,10 @@ class GameController {
       return false;
     }
 
+    const hostId = this.getRoomHostId(room);
     const players = Object.values(room.players || {});
-    const disconnected = players.filter(p => p.connected === false);
+    // Active disconnected players: Host if offline, or non-host who has not permanently left
+    const disconnected = players.filter(p => p.connected === false && (p.id === hostId || !p.left));
 
     if (disconnected.length > 0) {
       this.showPauseOverlay(room, disconnected);
@@ -1739,28 +1748,86 @@ class GameController {
     if (!this.modalPauseOverlay) return;
     this.modalPauseOverlay.classList.remove("hidden");
     this.modalPauseOverlay.classList.add("open");
-    this.pauseRoomCodeTag.textContent = `ROOM: ${room.meta.code}`;
-    const names = disconnected.map(p => p.name).join(", ");
-    this.pauseDisconnectedNames.textContent = names;
 
-    if (this.isHost) {
-      this.pauseHostActions.classList.remove("hidden");
-      this.pauseKickButtonsContainer.innerHTML = "";
-      disconnected.forEach(p => {
-        const btn = document.createElement("button");
-        btn.className = "btn btn-danger btn-block";
-        btn.style.height = "auto";
-        btn.style.padding = "8px 12px";
-        btn.style.fontSize = "12px";
-        btn.innerHTML = `
-          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          KICK ${this.escapeHtml(p.name.toUpperCase())} & CONTINUE
-        `;
-        btn.addEventListener("click", () => this.handleKickDisconnectedPlayer(p.id, p.name));
-        this.pauseKickButtonsContainer.appendChild(btn);
-      });
+    const hostId = this.getRoomHostId(room);
+    const hostPlayer = hostId && room.players ? room.players[hostId] : null;
+    const hostName = hostPlayer?.name || "Host";
+    const roomCode = room.meta?.code || this.currentRoomCode || "----";
+
+    if (this.pauseRoomCodeTag) {
+      this.pauseRoomCodeTag.textContent = `ROOM: ${roomCode}`;
+    }
+
+    const isHostDisconnected = disconnected.some(p => p.id === hostId);
+
+    if (isHostDisconnected) {
+      // Host is disconnected or left: pause game and wait for Host to return
+      if (this.pauseOverlayTitle) {
+        this.pauseOverlayTitle.textContent = "GAME PAUSED";
+      }
+      if (this.pauseOverlayMessage) {
+        this.pauseOverlayMessage.innerHTML = `GAME PAUSED - Waiting for the Host (<strong class="text-accent">${this.escapeHtml(hostName)}</strong>) to return to the room... (Room Code: ${this.escapeHtml(roomCode)})`;
+      } else if (this.pauseDisconnectedNames) {
+        this.pauseDisconnectedNames.textContent = `Host (${hostName})`;
+      }
+      if (this.pauseOverlaySubtitle) {
+        this.pauseOverlaySubtitle.textContent = "All scores, turns, and Top 10 lists are locked. The match will automatically resume as soon as they reconnect.";
+      }
+
+      // Inside Pause Overlay when Host is disconnected, NO ONE sees any kick buttons
+      if (this.pauseHostActions) {
+        this.pauseHostActions.classList.add("hidden");
+      }
+      if (this.pauseKickButtonsContainer) {
+        this.pauseKickButtonsContainer.innerHTML = "";
+      }
     } else {
-      this.pauseHostActions.classList.add("hidden");
+      // Regular non-host player(s) disconnected
+      const nonHostDisconnected = disconnected.filter(p => p.id !== hostId);
+      const names = nonHostDisconnected.map(p => p.name).join(", ");
+
+      if (this.pauseOverlayTitle) {
+        this.pauseOverlayTitle.textContent = "GAME PAUSED";
+      }
+      if (this.pauseOverlayMessage) {
+        this.pauseOverlayMessage.innerHTML = `Waiting for <strong class="text-accent">${this.escapeHtml(names)}</strong> to reconnect...`;
+      } else if (this.pauseDisconnectedNames) {
+        this.pauseDisconnectedNames.textContent = names;
+      }
+      if (this.pauseOverlaySubtitle) {
+        this.pauseOverlaySubtitle.textContent = "All scores, turns, and Top 10 lists are locked. The match will automatically resume as soon as they reconnect.";
+      }
+
+      // ONLY show kick buttons if the current user IS the Host (and host is connected)
+      if (this.isHost && this.myPlayerId === hostId) {
+        if (this.pauseHostActions) {
+          this.pauseHostActions.classList.remove("hidden");
+        }
+        if (this.pauseKickButtonsContainer) {
+          this.pauseKickButtonsContainer.innerHTML = "";
+          nonHostDisconnected.forEach(p => {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-danger btn-block";
+            btn.style.height = "auto";
+            btn.style.padding = "8px 12px";
+            btn.style.fontSize = "12px";
+            btn.innerHTML = `
+              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              KICK ${this.escapeHtml(p.name.toUpperCase())} & CONTINUE
+            `;
+            btn.addEventListener("click", () => this.handleKickDisconnectedPlayer(p.id, p.name));
+            this.pauseKickButtonsContainer.appendChild(btn);
+          });
+        }
+      } else {
+        // Non-host player viewing pause screen: ZERO kick buttons!
+        if (this.pauseHostActions) {
+          this.pauseHostActions.classList.add("hidden");
+        }
+        if (this.pauseKickButtonsContainer) {
+          this.pauseKickButtonsContainer.innerHTML = "";
+        }
+      }
     }
   }
 
@@ -1772,6 +1839,8 @@ class GameController {
   }
 
   handleKickDisconnectedPlayer(kickedId, kickedName) {
+    const hostId = this.getRoomHostId(this.roomData);
+    if (!this.isHost || this.myPlayerId !== hostId || kickedId === hostId) return;
     this.handleKickPlayer(kickedId, kickedName);
   }
 
@@ -2768,14 +2837,16 @@ class GameController {
     }
 
     // Render roster
+    const hostId = this.getRoomHostId(room);
     this.lobbyPlayerList.innerHTML = "";
     players.forEach(p => {
       const item = document.createElement("div");
-      item.className = "roster-item" + (p.id === this.myPlayerId ? " is-me" : "") + (p.isHost ? " is-host" : "");
+      const isThisPlayerHost = (p.id === hostId);
+      item.className = "roster-item" + (p.id === this.myPlayerId ? " is-me" : "") + (isThisPlayerHost ? " is-host" : "");
 
-      const isHostTag = p.isHost ? '<span class="badge badge-accent">HOST</span>' : '';
+      const isHostTag = isThisPlayerHost ? '<span class="badge badge-accent">HOST</span>' : '';
       const isYouTag = p.id === this.myPlayerId ? '<span class="badge">YOU</span>' : '';
-      const isKickable = this.isHost && p.id !== this.myPlayerId;
+      const isKickable = this.isHost && (this.myPlayerId === hostId) && p.id !== this.myPlayerId && p.id !== hostId;
 
       item.innerHTML = `
         <div class="roster-item-info">
@@ -2881,7 +2952,10 @@ class GameController {
   }
 
   handleKickPlayer(kickedPlayerId, kickedPlayerName) {
-    if (!this.isHost || !this.currentRoomCode || kickedPlayerId === this.myPlayerId) return;
+    const hostId = this.getRoomHostId(this.roomData);
+    if (!this.isHost || !this.currentRoomCode || this.myPlayerId !== hostId || kickedPlayerId === this.myPlayerId || kickedPlayerId === hostId) {
+      return;
+    }
     this.showConfirmModal({
       title: "REMOVE PLAYER",
       message: `Remove ${kickedPlayerName} from the room?`,
@@ -2892,7 +2966,10 @@ class GameController {
   }
 
   async executeKickPlayer(kickedPlayerId, kickedPlayerName) {
-    if (!this.isHost || !this.currentRoomCode || kickedPlayerId === this.myPlayerId) return;
+    const hostId = this.getRoomHostId(this.roomData);
+    if (!this.isHost || !this.currentRoomCode || this.myPlayerId !== hostId || kickedPlayerId === this.myPlayerId || kickedPlayerId === hostId) {
+      return;
+    }
 
     const room = this.roomData;
     if (!room || !room.players || !room.players[kickedPlayerId]) return;
@@ -3229,6 +3306,7 @@ class GameController {
   }
 
   updateEntryRosterStatus(room) {
+    const hostId = this.getRoomHostId(room);
     const players = Object.values(room.players || {});
     let lockedCount = 0;
     this.entryStatusRoster.innerHTML = "";
@@ -3238,7 +3316,7 @@ class GameController {
       const item = document.createElement("div");
       item.className = "lock-status-item";
       const isLocked = p.listSubmitted;
-      const isKickable = this.isHost && p.id !== this.myPlayerId;
+      const isKickable = this.isHost && (this.myPlayerId === hostId) && p.id !== this.myPlayerId && p.id !== hostId;
 
       item.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -3949,7 +4027,8 @@ class GameController {
       this.selectedBoardPlayerName.textContent = "My Secret List";
       this.selectedBoardScoreTag.textContent = `MY SCORE: ${player.points || 0} PTS`;
     } else {
-      const isKickable = this.isHost && targetId !== this.myPlayerId;
+      const hostId = this.getRoomHostId(room);
+      const isKickable = this.isHost && (this.myPlayerId === hostId) && targetId !== this.myPlayerId && targetId !== hostId;
       this.selectedBoardPlayerName.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
           <span>${this.escapeHtml(player.name)}'s List</span>
@@ -4069,6 +4148,7 @@ class GameController {
   }
 
   renderStandings(room) {
+    const hostId = this.getRoomHostId(room);
     const players = Object.values(room.players || {}).filter(p => !p.left);
     players.sort((a, b) => (b.points || 0) - (a.points || 0));
 
@@ -4076,7 +4156,7 @@ class GameController {
     players.forEach(p => {
       const badge = document.createElement("div");
       const isTurn = (p.id === room.game?.activePlayerId);
-      const isKickable = this.isHost && p.id !== this.myPlayerId;
+      const isKickable = this.isHost && (this.myPlayerId === hostId) && p.id !== this.myPlayerId && p.id !== hostId;
 
       badge.className = `standing-badge ${isTurn ? 'active-turn-standing' : ''}`;
       badge.innerHTML = `
