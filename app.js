@@ -1383,6 +1383,7 @@ class GameController {
           name: name,
           isHost: true,
           points: 0,
+          correctGuesses: 0,
           listSubmitted: false,
           targetCompleted: false,
           connected: true
@@ -1505,6 +1506,7 @@ class GameController {
       name: name,
       isHost: false,
       points: 0,
+      correctGuesses: 0,
       listSubmitted: false,
       targetCompleted: false,
       connected: true
@@ -3840,10 +3842,15 @@ class GameController {
       return;
     }
 
+    const guesserId = guesserPlayer.id || this.myPlayerId;
+    const newGuesserGuesses = (guesserPlayer.correctGuesses || 0) + 1;
+
     const updates = {};
     updates[`lists/${targetPlayerId}/${slot.rank}/revealed`] = true;
     updates[`lists/${targetPlayerId}/${slot.rank}/guessedBy`] = guesserPlayer.name;
-    updates[`players/${this.myPlayerId}/points`] = newGuesserPoints;
+    updates[`lists/${targetPlayerId}/${slot.rank}/guessedById`] = guesserId;
+    updates[`players/${guesserId}/points`] = newGuesserPoints;
+    updates[`players/${guesserId}/correctGuesses`] = newGuesserGuesses;
     updates["lastActivity"] = Date.now();
 
     this.checkAndRecordListCompletion(targetPlayerId, slot.rank, updates, actionText);
@@ -3978,12 +3985,15 @@ class GameController {
       const slot = this.roomData.lists[this.myPlayerId][confirmedRank];
       const points = slot.points;
       const newPoints = (guesserPlayer.points || 0) + points;
+      const newGuesses = (guesserPlayer.correctGuesses || 0) + 1;
       const actionText = `${confirmation.fromPlayerName} guessed '${slot.item}' on ${confirmation.toPlayerName}'s list (+${points} pts)`;
 
       const updates = {};
       updates[`lists/${this.myPlayerId}/${confirmedRank}/revealed`] = true;
       updates[`lists/${this.myPlayerId}/${confirmedRank}/guessedBy`] = confirmation.fromPlayerName;
+      updates[`lists/${this.myPlayerId}/${confirmedRank}/guessedById`] = guesserId;
       updates[`players/${guesserId}/points`] = newPoints;
+      updates[`players/${guesserId}/correctGuesses`] = newGuesses;
       updates["lastActivity"] = Date.now();
 
       this.checkAndRecordListCompletion(this.myPlayerId, confirmedRank, updates, actionText);
@@ -4292,29 +4302,88 @@ class GameController {
     }
   }
 
+  getPlayerCorrectGuesses(player, lists = {}) {
+    if (!player) return 0;
+    const playerId = player.id;
+    const playerName = (player.name || "").trim().toLowerCase();
+    let count = 0;
+
+    if (lists && typeof lists === "object") {
+      Object.values(lists).forEach(list => {
+        if (!list || typeof list !== "object") return;
+        for (let r = 1; r <= 10; r++) {
+          const slot = list[r];
+          if (!slot || !slot.revealed) continue;
+
+          const matchId = slot.guessedById && playerId && (slot.guessedById === playerId);
+          const matchName = slot.guessedBy && (slot.guessedBy.trim().toLowerCase() === playerName);
+
+          if (matchId || matchName) {
+            count++;
+          }
+        }
+      });
+    }
+
+    const storedCount = Number(player.correctGuesses) || 0;
+    return Math.max(count, storedCount);
+  }
+
   renderGameOver(room) {
+    const lists = room.lists || {};
     const players = Object.values(room.players || {}).filter(p => !p.left);
-    players.sort((a, b) => (b.points || 0) - (a.points || 0));
+
+    // Sort players by:
+    // 1. Total points (descending)
+    // 2. Total correct guesses (descending as tiebreaker)
+    players.sort((a, b) => {
+      const ptsA = Number(a.points) || 0;
+      const ptsB = Number(b.points) || 0;
+      if (ptsB !== ptsA) {
+        return ptsB - ptsA;
+      }
+      const guessesA = this.getPlayerCorrectGuesses(a, lists);
+      const guessesB = this.getPlayerCorrectGuesses(b, lists);
+      if (guessesB !== guessesA) {
+        return guessesB - guessesA;
+      }
+      return (a.name || "").localeCompare(b.name || "");
+    });
 
     const winner = players[0];
-    this.podiumWinnerName.textContent = winner ? `${winner.name} (${winner.points || 0} pts)` : "No Winner";
+    if (winner) {
+      const winnerGuesses = this.getPlayerCorrectGuesses(winner, lists);
+      const winnerGuessLabel = winnerGuesses === 1 ? "1 GUESS" : `${winnerGuesses} GUESSES`;
+      this.podiumWinnerName.innerHTML = `
+        <span class="winner-name-text">${this.escapeHtml(winner.name)}</span>
+        <span class="winner-stats-pill">${winner.points || 0} PTS • ${winnerGuessLabel}</span>
+      `;
+    } else {
+      this.podiumWinnerName.textContent = "No Winner";
+    }
 
     // Final leaderboard
     this.finalLeaderboardList.innerHTML = "";
     players.forEach((p, idx) => {
+      const pGuesses = this.getPlayerCorrectGuesses(p, lists);
+      const guessLabel = pGuesses === 1 ? "1 GUESS" : `${pGuesses} GUESSES`;
+      const isYou = (!this.isLocalMode && p.id === this.myPlayerId);
       const row = document.createElement("div");
       row.className = `final-score-row ${idx === 0 ? 'rank-1' : ''}`;
       row.innerHTML = `
         <span class="rank-pos">#${idx + 1}</span>
-        <span class="player-label">${this.escapeHtml(p.name)} ${p.id === this.myPlayerId ? '(You)' : ''}</span>
-        <span class="score-value">${p.points || 0} PTS</span>
+        <span class="player-label" title="${this.escapeHtml(p.name)}">${this.escapeHtml(p.name)} ${isYou ? '<span class="you-badge">(You)</span>' : ''}</span>
+        <span class="score-value">
+          <span class="score-pts">${p.points || 0} PTS</span>
+          <span class="score-sep">•</span>
+          <span class="score-guesses">${guessLabel}</span>
+        </span>
       `;
       this.finalLeaderboardList.appendChild(row);
     });
 
     // Full revealed lists for all players
     this.finalAllListsContainer.innerHTML = "";
-    const lists = room.lists || {};
     players.forEach(p => {
       const pList = lists[p.id] || {};
       const card = document.createElement("div");
@@ -4327,7 +4396,7 @@ class GameController {
         slotsHtml += `
           <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px;">
             <span><strong class="mono">#${r}</strong> ${this.escapeHtml(s.item)}</span>
-            <span class="mono text-secondary" style="font-size: 11px;">${r} pts ${s.guessedBy ? `(Guessed by ${s.guessedBy})` : '(Unguessed)'}</span>
+            <span class="mono text-secondary" style="font-size: 11px;">${r} pts ${s.guessedBy ? `(Guessed by ${this.escapeHtml(s.guessedBy)})` : '(Unguessed)'}</span>
           </div>
         `;
       }
@@ -4380,6 +4449,7 @@ class GameController {
     const players = this.roomData.players || {};
     Object.keys(players).forEach(pid => {
       updates[`players/${pid}/points`] = 0;
+      updates[`players/${pid}/correctGuesses`] = 0;
       updates[`players/${pid}/listSubmitted`] = false;
       updates[`players/${pid}/targetCompleted`] = false;
     });
@@ -4653,6 +4723,7 @@ class GameController {
         id: pid,
         name: name,
         points: 0,
+        correctGuesses: 0,
         listSubmitted: false,
         targetCompleted: false,
         missedGuesses: [],
@@ -4863,10 +4934,13 @@ class GameController {
   applyLocalCorrectGuess(slot, targetPlayerId, targetPlayerName, guesserPlayer) {
     const pointsAwarded = slot.points;
     const newGuesserPoints = (guesserPlayer.points || 0) + pointsAwarded;
+    const newGuesserGuesses = (guesserPlayer.correctGuesses || 0) + 1;
 
     slot.revealed = true;
     slot.guessedBy = guesserPlayer.name;
+    slot.guessedById = guesserPlayer.id;
     guesserPlayer.points = newGuesserPoints;
+    guesserPlayer.correctGuesses = newGuesserGuesses;
 
     const actionText = `${guesserPlayer.name} guessed '${slot.item}' on ${targetPlayerName}'s list (+${pointsAwarded} pts)`;
 
@@ -5216,6 +5290,7 @@ class GameController {
     const players = this.localMatch.players;
     Object.keys(players).forEach(pid => {
       players[pid].points = 0;
+      players[pid].correctGuesses = 0;
       players[pid].listSubmitted = false;
       players[pid].targetCompleted = false;
       players[pid].missedGuesses = [];

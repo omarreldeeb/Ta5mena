@@ -1198,10 +1198,37 @@ header.app-header {
 }
 
 .winner-highlight {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 900;
   color: var(--accent);
   letter-spacing: -0.02em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.winner-name-text {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.winner-stats-pill {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 14px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .final-scoreboard {
@@ -1240,13 +1267,43 @@ header.app-header {
 .final-score-row .player-label {
   font-weight: 700;
   font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.final-score-row .player-label .you-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-left: 4px;
 }
 
 .final-score-row .score-value {
   font-family: var(--font-mono);
   font-weight: 800;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.final-score-row .score-pts {
+  color: var(--success);
+}
+
+.final-score-row .score-sep {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.final-score-row .score-guesses {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 /* Header My List Button & Drawer */
@@ -2503,6 +2560,28 @@ header.app-header {
     max-height: 24px !important;
     font-size: 10px !important;
     padding: 0 4px !important;
+  }
+  .final-score-row {
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+    padding: 10px 10px;
+  }
+  .final-score-row .player-label {
+    font-size: 13px;
+  }
+  .final-score-row .score-value {
+    font-size: 12px;
+    gap: 4px;
+  }
+  .final-score-row .score-guesses {
+    font-size: 11px;
+  }
+  .winner-name-text {
+    font-size: 20px;
+  }
+  .winner-stats-pill {
+    font-size: 11px;
+    padding: 3px 10px;
   }
 }
 
