@@ -445,7 +445,9 @@ class SoundEngine {
 
 class GameController {
   constructor() {
-    this.myPlayerId = null;
+    this.isJoining = false;
+    this.isCreating = false;
+    this.myPlayerId = this.getOrCreatePersistentPlayerId();
     this.myPlayerName = "";
     this.currentRoomCode = null;
     this.isHost = false;
@@ -844,6 +846,7 @@ class GameController {
 
     // Window navigation sync
     window.addEventListener("hashchange", () => {
+      if (this.isJoining || this.isCreating) return;
       const codeInUrl = this.getRoomCodeFromUrl();
       if (!codeInUrl && this.currentRoomCode && !this.isLocalMode) {
         this.executeLeaveRoom();
@@ -925,26 +928,12 @@ class GameController {
       if (e.key === "Enter") this.submitCustomHint();
     });
 
-    // Home
+    // Home (strictly ONE handler per button, no duplicate document listener)
     const btnCreate = this.btnCreateRoom || document.getElementById("btn-create-room") || document.getElementById("create-room-btn");
     btnCreate?.addEventListener("click", () => this.handleCreateRoom());
 
     const btnJoin = this.btnJoinRoom || document.getElementById("btn-join-room") || document.getElementById("join-room-btn");
     btnJoin?.addEventListener("click", () => this.handleJoinRoom());
-
-    // Delegated click fallback for Create Room and Join Room
-    document.addEventListener("click", (e) => {
-      const createTrigger = e.target.closest("#btn-create-room, #create-room-btn");
-      if (createTrigger) {
-        e.preventDefault();
-        this.handleCreateRoom();
-      }
-      const joinTrigger = e.target.closest("#btn-join-room, #join-room-btn");
-      if (joinTrigger) {
-        e.preventDefault();
-        this.handleJoinRoom();
-      }
-    });
     this.inputRoomCode?.addEventListener("input", (e) => {
       e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
     });
@@ -1598,9 +1587,9 @@ class GameController {
   }
 
   discardSession() {
-    localStorage.removeItem("ta5mena_player_id");
     localStorage.removeItem("ta5mena_room_code");
-    this.reconnectBox.classList.add("hidden");
+    this.currentRoomCode = null;
+    if (this.reconnectBox) this.reconnectBox.classList.add("hidden");
   }
 
   async touchRoomActivity(roomCode = this.currentRoomCode) {
@@ -1663,8 +1652,24 @@ class GameController {
     return code;
   }
 
+  getOrCreatePersistentPlayerId() {
+    let pid = "";
+    try {
+      pid = localStorage.getItem("ta5mena_player_id") || "";
+    } catch (e) {}
+    if (!pid || typeof pid !== "string" || !pid.startsWith("p_") || pid.length < 5) {
+      pid = "p_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36).slice(-4);
+      try {
+        localStorage.setItem("ta5mena_player_id", pid);
+      } catch (e) {}
+    }
+    this.playerId = pid;
+    this.myPlayerId = pid;
+    return pid;
+  }
+
   generatePlayerId() {
-    return "p_" + Math.random().toString(36).substring(2, 10);
+    return this.getOrCreatePersistentPlayerId();
   }
 
   createRoom() {
@@ -1672,66 +1677,77 @@ class GameController {
   }
 
   async handleCreateRoom() {
-    const nameInput = this.inputPlayerName || document.getElementById("input-player-name");
-    const name = nameInput ? nameInput.value.trim() : (this.myPlayerName || "").trim();
-    if (!name) {
-      this.showAlert("Please enter your name first.");
-      if (nameInput) nameInput.focus();
-      return;
+    if (this.isCreating) return;
+    this.isCreating = true;
+
+    const createBtn = this.btnCreateRoom || document.getElementById("btn-create-room") || document.getElementById("create-room-btn");
+    const origCreateHtml = createBtn ? createBtn.innerHTML : "Create Room";
+    if (createBtn) {
+      createBtn.disabled = true;
+      createBtn.textContent = "CREATING...";
     }
 
-    this.myPlayerName = name;
     try {
-      localStorage.setItem("ta5mena_player_name", name);
-    } catch (e) {}
-
-    const roomCode = this.generateRoomCode();
-    const playerId = this.generatePlayerId();
-    this.myPlayerId = playerId;
-    this.isHost = true;
-    this.currentRoomCode = roomCode;
-
-    const initialRoom = {
-      lastActivity: Date.now(),
-      hostId: playerId,
-      meta: {
-        code: roomCode,
-        hostId: playerId,
-        category: "singers",
-        turnTimer: 0,
-        autoSkipLastPlayer: false,
-        status: "lobby",
-        createdAt: Date.now()
-      },
-      players: {
-        [playerId]: {
-          id: playerId,
-          name: name,
-          isHost: true,
-          points: 0,
-          correctGuesses: 0,
-          listSubmitted: false,
-          targetCompleted: false,
-          connected: true
-        }
-      },
-      lists: {},
-      finishedOrder: [],
-      game: {
-        turnOrder: [],
-        currentTurnIndex: 0,
-        activePlayerId: "",
-        round: 1,
-        lastAction: {
-          text: `Room created by ${name}. Waiting for players.`,
-          type: "general",
-          timestamp: Date.now()
-        },
-        confirmation: ""
+      const nameInput = this.inputPlayerName || document.getElementById("input-player-name");
+      const name = nameInput ? nameInput.value.trim() : (this.myPlayerName || "").trim();
+      if (!name) {
+        this.showAlert("Please enter your name first.");
+        if (nameInput) nameInput.focus();
+        return;
       }
-    };
 
-    try {
+      this.myPlayerName = name;
+      try {
+        localStorage.setItem("ta5mena_player_name", name);
+      } catch (e) {}
+
+      const roomCode = this.generateRoomCode();
+      const playerId = this.getOrCreatePersistentPlayerId();
+      this.myPlayerId = playerId;
+      this.playerId = playerId;
+      this.isHost = true;
+      this.currentRoomCode = roomCode;
+
+      const initialRoom = {
+        lastActivity: Date.now(),
+        hostId: playerId,
+        meta: {
+          code: roomCode,
+          hostId: playerId,
+          category: "singers",
+          turnTimer: 0,
+          autoSkipLastPlayer: false,
+          status: "lobby",
+          createdAt: Date.now()
+        },
+        players: {
+          [playerId]: {
+            id: playerId,
+            name: name,
+            isHost: true,
+            points: 0,
+            correctGuesses: 0,
+            listSubmitted: false,
+            targetCompleted: false,
+            connected: true
+          }
+        },
+        lists: {},
+        finishedOrder: [],
+        game: {
+          turnOrder: [],
+          currentTurnIndex: 0,
+          activePlayerId: "",
+          round: 1,
+          lastAction: {
+            text: `Room created by ${name}. Waiting for players.`,
+            type: "general",
+            timestamp: Date.now()
+          },
+          confirmation: ""
+        }
+      };
+
       await db.set(`rooms/${roomCode}`, initialRoom);
       await db.registerSoloLobbyDisconnect(roomCode);
       await db.trackPlayerConnection(roomCode, playerId);
@@ -1741,115 +1757,164 @@ class GameController {
     } catch (err) {
       console.error("Failed to create room in Firebase:", err);
       this.showAlert("Failed to create room. Please try again.");
+    } finally {
+      this.isCreating = false;
+      if (createBtn) {
+        createBtn.disabled = false;
+        createBtn.innerHTML = origCreateHtml;
+      }
     }
   }
 
   async handleJoinRoom() {
-    const name = this.inputPlayerName.value.trim();
-    const code = this.inputRoomCode.value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+    if (this.isJoining) return;
+    this.isJoining = true;
 
-    if (!name) {
-      this.showAlert("Please enter your name first.");
-      this.inputPlayerName.focus();
-      return;
-    }
-    if (code.length !== 4) {
-      this.showAlert("Room code must be 4 letters.");
-      this.inputRoomCode.focus();
-      return;
+    const joinBtn = this.btnJoinRoom || document.getElementById("btn-join-room") || document.getElementById("join-room-btn");
+    const origJoinHtml = joinBtn ? joinBtn.innerHTML : "Join Room";
+    if (joinBtn) {
+      joinBtn.disabled = true;
+      joinBtn.textContent = "JOINING...";
     }
 
-    const room = await db.get(`rooms/${code}`);
-    if (!room) {
-      this.showAlert(`Room "${code}" not found.`);
-      return;
-    }
+    try {
+      const nameInput = this.inputPlayerName || document.getElementById("input-player-name");
+      const codeInput = this.inputRoomCode || document.getElementById("input-room-code");
+      const name = nameInput ? nameInput.value.trim() : (this.myPlayerName || "").trim();
+      const code = codeInput ? codeInput.value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4) : "";
 
-    const savedPlayerId = localStorage.getItem("ta5mena_player_id");
-    const existingPlayers = Object.values(room.players || {});
-    const normInputName = name.trim().toLowerCase();
-    const hostId = this.getRoomHostId(room);
-    const hostPlayer = hostId && room.players ? room.players[hostId] : null;
+      if (!name) {
+        this.showAlert("Please enter your name first.");
+        if (nameInput) nameInput.focus();
+        return;
+      }
+      if (code.length !== 4) {
+        this.showAlert("Room code must be 4 letters.");
+        if (codeInput) codeInput.focus();
+        return;
+      }
 
-    // 1. Seat Rejoin / Reconnection (prioritizing host seat if matching host name, or saved playerId, or matching seat name)
-    let seatPlayer = null;
-    if (hostPlayer && hostPlayer.name && hostPlayer.name.trim().toLowerCase() === normInputName) {
-      seatPlayer = hostPlayer;
-    } else if (savedPlayerId && room.players && room.players[savedPlayerId]) {
-      seatPlayer = room.players[savedPlayerId];
-    } else {
-      seatPlayer = existingPlayers.find(p => p.name && p.name.trim().toLowerCase() === normInputName);
-    }
+      const room = await db.get(`rooms/${code}`);
+      if (!room) {
+        this.showAlert(`Room "${code}" not found.`);
+        return;
+      }
 
-    if (seatPlayer) {
-      const updates = {};
-      updates[`players/${seatPlayer.id}/connected`] = true;
-      updates[`players/${seatPlayer.id}/left`] = false;
-      updates["lastActivity"] = Date.now();
+      const myId = this.getOrCreatePersistentPlayerId();
+      this.playerId = myId;
+      this.myPlayerId = myId;
+      const existingPlayers = Object.values(room.players || {});
+      const normInputName = name.trim().toLowerCase();
+      const hostId = this.getRoomHostId(room);
+      const hostPlayer = hostId && room.players ? room.players[hostId] : null;
 
-      if (room.meta && room.meta.status === "playing") {
-        const currentTurnOrder = room.game?.turnOrder || [];
-        if (!currentTurnOrder.includes(seatPlayer.id)) {
-          updates["game/turnOrder"] = [...currentTurnOrder, seatPlayer.id];
+      // 1. Check if this device already has an existing seat in the room (myId) or matching host seat recovery
+      let seatPlayer = null;
+      if (room.players && room.players[myId]) {
+        seatPlayer = room.players[myId];
+      } else if (hostPlayer && hostPlayer.name && hostPlayer.name.trim().toLowerCase() === normInputName && (hostId === myId || hostPlayer.connected === false)) {
+        seatPlayer = hostPlayer;
+      }
+
+      if (seatPlayer) {
+        const updates = {};
+        updates[`players/${seatPlayer.id}/connected`] = true;
+        updates[`players/${seatPlayer.id}/left`] = false;
+        updates[`players/${seatPlayer.id}/name`] = name;
+        updates["lastActivity"] = Date.now();
+
+        if (room.meta && room.meta.status === "playing") {
+          const currentTurnOrder = room.game?.turnOrder || [];
+          if (!currentTurnOrder.includes(seatPlayer.id)) {
+            updates["game/turnOrder"] = [...currentTurnOrder, seatPlayer.id];
+          }
+
+          const activeCount = existingPlayers.filter(p => p.id !== seatPlayer.id && !p.left).length + 1;
+          if (activeCount >= 3) {
+            updates["game/lastAction"] = {
+              text: `${seatPlayer.name} rejoined! Match returned to 3+ Player Mode.`,
+              type: "general",
+              timestamp: Date.now()
+            };
+          }
         }
 
-        // Active players after rejoining (bringing active count back to 3+)
-        const activeCount = existingPlayers.filter(p => p.id !== seatPlayer.id && !p.left).length + 1;
-        if (activeCount >= 3) {
-          updates["game/lastAction"] = {
-            text: `${seatPlayer.name} rejoined! Match returned to 3+ Player Mode.`,
-            type: "general",
-            timestamp: Date.now()
-          };
+        await db.update(`rooms/${code}`, updates);
+        this.saveSession(seatPlayer.id, name, code);
+        await this.touchRoomActivity(code);
+        await db.setPlayerConnected(code, seatPlayer.id, true);
+        await db.trackPlayerConnection(code, seatPlayer.id);
+        this.updateRoomUrl(code);
+        this.subscribeToRoom(code);
+        this.showAlert(`Welcome back, ${seatPlayer.name}! Reconnected to seat.`);
+        return;
+      }
+
+      // 2. Before writing to rooms/{code}/players/{this.playerId}, inspect room.players for name collisions:
+      // If any OTHER player ID (id !== this.playerId) already has the same normalized name:
+      const otherPlayersWithSameName = existingPlayers.filter(
+        p => p && p.id !== myId && p.name && p.name.trim().toLowerCase() === normInputName
+      );
+
+      if (otherPlayersWithSameName.length > 0) {
+        const isLobby = !room.meta || room.meta.status === "lobby";
+        const activeConflict = otherPlayersWithSameName.find(p => p.connected === true && !p.left);
+        if (activeConflict) {
+          this.showAlert("Name already taken in this room! Pick another name.");
+          if (nameInput) nameInput.focus();
+          return;
+        }
+
+        // If disconnected (p.connected === false) and in lobby, delete the stale ghost node(s) first so it doesn't leave a clone behind
+        if (isLobby) {
+          for (const ghost of otherPlayersWithSameName) {
+            if (ghost.connected === false || ghost.left) {
+              try {
+                await db.remove(`rooms/${code}/players/${ghost.id}`);
+                await db.remove(`rooms/${code}/lists/${ghost.id}`);
+              } catch (e) {}
+            }
+          }
+        } else {
+          this.showAlert("Name already taken in this room! Pick another name.");
+          return;
         }
       }
 
-      await db.update(`rooms/${code}`, updates);
-      this.saveSession(seatPlayer.id, seatPlayer.name, code);
+      if (room.meta && room.meta.status !== "lobby") {
+        this.showAlert("This match has already started and you do not have an existing seat in this room.");
+        return;
+      }
+
+      // 3. New player joining lobby with persistent device ID (writing to rooms/{code}/players/{this.playerId})
+      const playerId = myId;
+      const newPlayer = {
+        id: playerId,
+        name: name,
+        isHost: false,
+        points: 0,
+        correctGuesses: 0,
+        listSubmitted: false,
+        targetCompleted: false,
+        connected: true
+      };
+
+      await db.update(`rooms/${code}/players/${playerId}`, newPlayer);
       await this.touchRoomActivity(code);
-      await db.setPlayerConnected(code, seatPlayer.id, true);
-      await db.trackPlayerConnection(code, seatPlayer.id);
+      await db.trackPlayerConnection(code, playerId);
+      this.saveSession(playerId, name, code);
       this.updateRoomUrl(code);
       this.subscribeToRoom(code);
-      this.showAlert(`Welcome back, ${seatPlayer.name}! Reconnected to seat.`);
-      return;
+    } catch (err) {
+      console.error("Failed to join room in Firebase:", err);
+      this.showAlert("Failed to join room. Please try again.");
+    } finally {
+      this.isJoining = false;
+      if (joinBtn) {
+        joinBtn.disabled = false;
+        joinBtn.innerHTML = origJoinHtml;
+      }
     }
-
-    // 2. Block duplicate player names (Fix Host Hijacking Bug):
-    const nameTaken = existingPlayers.some(
-      p => p.name && p.name.trim().toLowerCase() === normInputName && !p.left && p.id !== savedPlayerId
-    );
-
-    if (nameTaken) {
-      this.showAlert("That name is already taken in this room. Please choose a different name.");
-      this.inputPlayerName.focus();
-      return;
-    }
-
-    if (room.meta && room.meta.status !== "lobby") {
-      this.showAlert("This match has already started and you do not have an existing seat in this room.");
-      return;
-    }
-
-    // 3. Brand new player joining lobby
-    const playerId = this.generatePlayerId();
-    const newPlayer = {
-      id: playerId,
-      name: name,
-      isHost: false,
-      points: 0,
-      correctGuesses: 0,
-      listSubmitted: false,
-      targetCompleted: false,
-      connected: true
-    };
-
-    await db.update(`rooms/${code}/players/${playerId}`, newPlayer);
-    await this.touchRoomActivity(code);
-    await db.trackPlayerConnection(code, playerId);
-    this.saveSession(playerId, name, code);
-    this.updateRoomUrl(code);
-    this.subscribeToRoom(code);
   }
 
   // ==========================================================================
@@ -3186,6 +3251,29 @@ class GameController {
     // Render roster
     const hostId = this.getRoomHostId(room);
     this.lobbyPlayerList.innerHTML = "";
+
+    // Auto-clean duplicate ghost clones: if two entries have the exact same lowercase name and one is disconnected
+    if (this.isHost && this.currentRoomCode && (!room.meta || room.meta.status === "lobby")) {
+      const nameGroups = {};
+      players.forEach(p => {
+        const norm = (p.name || "").trim().toLowerCase();
+        if (norm) {
+          if (!nameGroups[norm]) nameGroups[norm] = [];
+          nameGroups[norm].push(p);
+        }
+      });
+      Object.values(nameGroups).forEach(group => {
+        if (group.length > 1) {
+          group.forEach(p => {
+            if (p.connected === false && p.id !== hostId && p.id !== this.myPlayerId) {
+              db.remove(`rooms/${this.currentRoomCode}/players/${p.id}`);
+              db.remove(`rooms/${this.currentRoomCode}/lists/${p.id}`);
+            }
+          });
+        }
+      });
+    }
+
     players.forEach(p => {
       const item = document.createElement("div");
       const isThisPlayerHost = (p.id === hostId);
