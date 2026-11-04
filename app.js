@@ -613,6 +613,9 @@ class GameController {
 
     // Entry Phase
     this.entryCategoryTitle = document.getElementById("entry-category-title");
+    this.entryBuilderToolbar = document.getElementById("entry-builder-toolbar");
+    this.btnRandomizeAllSlots = document.getElementById("btn-randomize-all-slots");
+    this.btnFillEmptySlots = document.getElementById("btn-fill-empty-slots");
     this.restoreBanner = document.getElementById("restore-banner");
     this.restoreCategoryLabel = document.getElementById("restore-category-label");
     this.btnRestoreLastList = document.getElementById("btn-restore-last-list");
@@ -622,6 +625,11 @@ class GameController {
     this.entryWaitingCard = document.getElementById("entry-waiting-card");
     this.entryLockedCount = document.getElementById("entry-locked-count");
     this.entryStatusRoster = document.getElementById("entry-status-roster");
+
+    // Purge legacy flat list storage key
+    try {
+      localStorage.removeItem("ta5mena_last_list");
+    } catch (e) {}
 
     // Main Game Phase
     this.actionFeedText = document.getElementById("action-feed-text");
@@ -968,6 +976,8 @@ class GameController {
     this.btnStartMatch?.addEventListener("click", () => this.handleStartMatch());
 
     // Entry Phase
+    this.btnRandomizeAllSlots?.addEventListener("click", () => this.randomizeAllSlots());
+    this.btnFillEmptySlots?.addEventListener("click", () => this.fillEmptySlots());
     this.btnRestoreLastList?.addEventListener("click", () => this.restoreLastList());
     this.btnSubmitList?.addEventListener("click", () => this.handleSubmitSecretList());
 
@@ -3398,25 +3408,29 @@ class GameController {
 
   renderEntryPhase(room) {
     const cat = room.meta.category || "singers";
+    const categoryChanged = (this.lastBuiltCategory && this.lastBuiltCategory !== cat);
     this.category = cat;
+    this.lastBuiltCategory = cat;
     this.entryCategoryTitle.textContent = this.getCategoryTitle(cat);
 
     const me = room.players[this.myPlayerId];
     const isSubmitted = me && me.listSubmitted;
 
-    // Render slots input form if not yet created
-    if (this.entrySlotsContainer.children.length === 0) {
+    // Render slots input form if not yet created or category changed
+    if (this.entrySlotsContainer.children.length === 0 || categoryChanged) {
       this.buildEntrySlots();
     }
 
     if (isSubmitted) {
       this.btnSubmitList.disabled = true;
       this.btnSubmitList.textContent = "Top 10 Locked In";
-      // Disable inputs
+      // Disable inputs and buttons
       for (let i = 1; i <= 10; i++) {
         const input = document.getElementById(`entry-slot-input-${i}`);
         if (input) input.disabled = true;
       }
+      document.querySelectorAll(".btn-slot-action, .btn-slot-dice, .btn-slot-reorder").forEach(btn => btn.disabled = true);
+      if (this.entryBuilderToolbar) this.entryBuilderToolbar.classList.add("hidden");
       if (this.restoreBanner) this.restoreBanner.classList.add("hidden");
       this.entryWaitingCard.classList.remove("hidden");
       this.updateEntryRosterStatus(room);
@@ -3426,8 +3440,13 @@ class GameController {
         <svg class="icon" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         Lock In My Top 10
       `;
+      for (let i = 1; i <= 10; i++) {
+        const input = document.getElementById(`entry-slot-input-${i}`);
+        if (input) input.disabled = false;
+      }
+      document.querySelectorAll(".btn-slot-action, .btn-slot-dice, .btn-slot-reorder").forEach(btn => btn.disabled = false);
       this.entryWaitingCard.classList.add("hidden");
-      this.checkRestoreButtonVisibility();
+      this.updateListBuilderControls();
     }
 
     // Check if ALL players have submitted their lists. If so, transition to 'playing'
@@ -3436,6 +3455,9 @@ class GameController {
 
   buildEntrySlots() {
     this.entrySlotsContainer.innerHTML = "";
+    const svgDice = `<svg viewBox="0 0 24 24" class="icon-dice" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/><circle cx="17" cy="7" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="7" cy="17" r="1.5" fill="currentColor"/><circle cx="17" cy="17" r="1.5" fill="currentColor"/></svg>`;
+    const isCustom = (this.category || "singers").toLowerCase().trim() === "custom";
+
     for (let rank = 1; rank <= 10; rank++) {
       const row = document.createElement("div");
       row.className = "slot-row";
@@ -3449,11 +3471,14 @@ class GameController {
           <input type="text" id="entry-slot-input-${rank}" placeholder="Rank #${rank} (${rank} ${rank === 1 ? 'pt' : 'pts'})" autocomplete="off">
           <div id="autocomplete-slot-${rank}" class="autocomplete-dropdown"></div>
         </div>
-        <div class="slot-reorder-group">
-          <button type="button" class="btn-slot-reorder btn-slot-up" data-rank="${rank}" title="Move Up" ${rank === 1 ? 'disabled' : ''}>
+        <div class="slot-actions-group slot-reorder-group">
+          <button type="button" class="btn-slot-action btn-slot-dice ${isCustom ? 'hidden' : ''}" data-rank="${rank}" title="Randomize this slot">
+            ${svgDice}
+          </button>
+          <button type="button" class="btn-slot-action btn-slot-reorder btn-slot-up" data-rank="${rank}" title="Move Up" ${rank === 1 ? 'disabled' : ''}>
             <svg viewBox="0 0 24 24" class="icon-reorder" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
-          <button type="button" class="btn-slot-reorder btn-slot-down" data-rank="${rank}" title="Move Down" ${rank === 10 ? 'disabled' : ''}>
+          <button type="button" class="btn-slot-action btn-slot-reorder btn-slot-down" data-rank="${rank}" title="Move Down" ${rank === 10 ? 'disabled' : ''}>
             <svg viewBox="0 0 24 24" class="icon-reorder" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
         </div>
@@ -3462,15 +3487,22 @@ class GameController {
 
       const input = row.querySelector(`#entry-slot-input-${rank}`);
       const dropdown = row.querySelector(`#autocomplete-slot-${rank}`);
-      input.addEventListener("input", () => this.backupSecretList());
+      input.addEventListener("input", () => {
+        this.backupSecretList();
+        this.checkEmptySlotsCount();
+      });
       this.setupAutocomplete(input, dropdown);
 
+      const btnDice = row.querySelector(".btn-slot-dice");
       const btnUp = row.querySelector(".btn-slot-up");
       const btnDown = row.querySelector(".btn-slot-down");
 
+      btnDice?.addEventListener("click", () => this.randomizeSingleSlot(rank));
       btnUp?.addEventListener("click", () => this.swapEntrySlots(rank, rank - 1));
       btnDown?.addEventListener("click", () => this.swapEntrySlots(rank, rank + 1));
     }
+
+    this.updateListBuilderControls();
   }
 
   swapEntrySlots(rankA, rankB) {
@@ -3496,6 +3528,7 @@ class GameController {
     });
 
     this.backupSecretList();
+    this.checkEmptySlotsCount();
   }
 
   setupAutocomplete(inputElement, dropdownElement) {
@@ -3528,6 +3561,7 @@ class GameController {
           dropdownElement.classList.remove("open");
           dropdownElement.innerHTML = "";
           this.backupSecretList();
+          this.checkEmptySlotsCount();
         });
         dropdownElement.appendChild(item);
       });
@@ -3540,6 +3574,200 @@ class GameController {
         dropdownElement.classList.remove("open");
       }, 200);
     });
+  }
+
+  randomizeSingleSlot(rank) {
+    const catKey = (this.category || "singers").toLowerCase().trim();
+    if (catKey === "custom") return;
+
+    const pool = (SUGGESTIONS && SUGGESTIONS[catKey]) ? SUGGESTIONS[catKey] : (window.SUGGESTIONS && window.SUGGESTIONS[catKey] ? window.SUGGESTIONS[catKey] : []);
+    if (!pool || pool.length === 0) return;
+
+    // Collect currently used items in all other 9 slots (excluding slot rank)
+    const currentValues = new Set();
+    for (let r = 1; r <= 10; r++) {
+      if (r === rank) continue;
+      const inp = document.getElementById(`entry-slot-input-${r}`);
+      const val = inp ? inp.value.trim() : "";
+      if (val) {
+        currentValues.add(normalizeText(val));
+      }
+    }
+
+    // Filter suggestions pool for items not already present in the other 9 slots
+    const available = pool.filter(item => {
+      const name = item.name || item;
+      const nameNorm = normalizeText(name);
+      const arNorm = item.ar ? normalizeText(item.ar) : "";
+      return !currentValues.has(nameNorm) && (!arNorm || !currentValues.has(arNorm));
+    });
+
+    const candidates = available.length > 0 ? available : pool;
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    const chosenName = picked.name || picked;
+
+    const input = document.getElementById(`entry-slot-input-${rank}`);
+    if (input) {
+      input.value = chosenName;
+      input.classList.add("slot-swap-flash");
+      setTimeout(() => input.classList.remove("slot-swap-flash"), 250);
+    }
+
+    this.backupSecretList();
+    this.checkEmptySlotsCount();
+    if (this.entryErrorBanner) this.entryErrorBanner.classList.add("hidden");
+  }
+
+  randomizeAllSlots() {
+    const catKey = (this.category || "singers").toLowerCase().trim();
+    if (catKey === "custom") {
+      this.showAlert("Randomize is not available for custom topics.");
+      return;
+    }
+
+    const pool = (SUGGESTIONS && SUGGESTIONS[catKey]) ? SUGGESTIONS[catKey] : (window.SUGGESTIONS && window.SUGGESTIONS[catKey] ? window.SUGGESTIONS[catKey] : []);
+    if (!pool || pool.length < 10) return;
+
+    // Pick 10 unique items
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const selected = [];
+    const seen = new Set();
+    for (const item of shuffled) {
+      const name = item.name || item;
+      const norm = normalizeText(name);
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        selected.push(name);
+        if (selected.length === 10) break;
+      }
+    }
+
+    for (let r = 1; r <= 10; r++) {
+      const input = document.getElementById(`entry-slot-input-${r}`);
+      if (input && selected[r - 1]) {
+        input.value = selected[r - 1];
+        input.classList.add("slot-swap-flash");
+      }
+    }
+
+    setTimeout(() => {
+      for (let r = 1; r <= 10; r++) {
+        const input = document.getElementById(`entry-slot-input-${r}`);
+        if (input) input.classList.remove("slot-swap-flash");
+      }
+    }, 250);
+
+    this.backupSecretList();
+    this.checkEmptySlotsCount();
+    if (this.entryErrorBanner) this.entryErrorBanner.classList.add("hidden");
+    const catTitle = this.getCategoryTitle(catKey);
+    this.showAlert(`Randomized 10 unique picks for ${catTitle}!`);
+  }
+
+  fillEmptySlots() {
+    const catKey = (this.category || "singers").toLowerCase().trim();
+    if (catKey === "custom") return;
+
+    const pool = (SUGGESTIONS && SUGGESTIONS[catKey]) ? SUGGESTIONS[catKey] : (window.SUGGESTIONS && window.SUGGESTIONS[catKey] ? window.SUGGESTIONS[catKey] : []);
+    if (!pool || pool.length === 0) return;
+
+    const seen = new Set();
+    const emptyRanks = [];
+    for (let r = 1; r <= 10; r++) {
+      const input = document.getElementById(`entry-slot-input-${r}`);
+      const val = input ? input.value.trim() : "";
+      if (val) {
+        seen.add(normalizeText(val));
+      } else {
+        emptyRanks.push(r);
+      }
+    }
+
+    if (emptyRanks.length === 0) return;
+
+    const available = pool.filter(item => {
+      const name = item.name || item;
+      const nameNorm = normalizeText(name);
+      const arNorm = item.ar ? normalizeText(item.ar) : "";
+      return !seen.has(nameNorm) && (!arNorm || !seen.has(arNorm));
+    });
+
+    const shuffled = [...available].sort(() => Math.random() - 0.5);
+    let fillIdx = 0;
+    emptyRanks.forEach(r => {
+      if (fillIdx < shuffled.length) {
+        const item = shuffled[fillIdx++];
+        const name = item.name || item;
+        seen.add(normalizeText(name));
+        const input = document.getElementById(`entry-slot-input-${r}`);
+        if (input) {
+          input.value = name;
+          input.classList.add("slot-swap-flash");
+        }
+      }
+    });
+
+    setTimeout(() => {
+      emptyRanks.forEach(r => {
+        const input = document.getElementById(`entry-slot-input-${r}`);
+        if (input) input.classList.remove("slot-swap-flash");
+      });
+    }, 250);
+
+    this.backupSecretList();
+    this.checkEmptySlotsCount();
+    if (this.entryErrorBanner) this.entryErrorBanner.classList.add("hidden");
+  }
+
+  checkEmptySlotsCount() {
+    let emptyCount = 0;
+    let filledCount = 0;
+    for (let r = 1; r <= 10; r++) {
+      const input = document.getElementById(`entry-slot-input-${r}`);
+      const val = input ? input.value.trim() : "";
+      if (val) filledCount++;
+      else emptyCount++;
+    }
+
+    if (this.btnFillEmptySlots) {
+      const catKey = (this.category || "singers").toLowerCase().trim();
+      if (catKey === "custom" || filledCount === 0 || emptyCount === 0) {
+        this.btnFillEmptySlots.classList.add("hidden");
+      } else {
+        this.btnFillEmptySlots.classList.remove("hidden");
+        const span = this.btnFillEmptySlots.querySelector("span");
+        if (span) span.textContent = `FILL EMPTY (${emptyCount})`;
+      }
+    }
+  }
+
+  updateListBuilderControls() {
+    const catKey = (this.category || "singers").toLowerCase().trim();
+    const isCustom = catKey === "custom";
+
+    if (this.entryBuilderToolbar) {
+      if (isCustom) {
+        this.entryBuilderToolbar.classList.add("hidden");
+        this.entryBuilderToolbar.style.display = "none";
+      } else {
+        this.entryBuilderToolbar.classList.remove("hidden");
+        this.entryBuilderToolbar.style.display = "";
+      }
+    }
+
+    // Toggle single-slot dice buttons
+    document.querySelectorAll(".btn-slot-dice").forEach(btn => {
+      if (isCustom) {
+        btn.classList.add("hidden");
+        btn.style.display = "none";
+      } else {
+        btn.classList.remove("hidden");
+        btn.style.display = "";
+      }
+    });
+
+    this.checkRestoreButtonVisibility();
+    this.checkEmptySlotsCount();
   }
 
   async handleSubmitSecretList() {
@@ -3596,6 +3824,9 @@ class GameController {
   }
 
   backupSecretList() {
+    const cat = (this.category || "singers").toLowerCase().trim();
+    if (cat === "custom") return;
+
     const items = {};
     let filledCount = 0;
     for (let rank = 1; rank <= 10; rank++) {
@@ -3606,80 +3837,110 @@ class GameController {
     }
 
     if (filledCount > 0) {
-      const cat = this.category || "singers";
-      const backupData = {
-        category: cat,
+      // Delete old legacy flat key
+      try {
+        localStorage.removeItem("ta5mena_last_list");
+      } catch (e) {}
+
+      let allSaved = {};
+      try {
+        const raw = localStorage.getItem("ta5mena_saved_lists_by_category");
+        if (raw) allSaved = JSON.parse(raw) || {};
+      } catch (e) {}
+
+      allSaved[cat] = {
         items: items,
         timestamp: Date.now()
       };
-      localStorage.setItem(`ta5mena_last_list_${cat}`, JSON.stringify(backupData));
-      localStorage.setItem("ta5mena_last_list", JSON.stringify(backupData));
+
+      try {
+        localStorage.setItem("ta5mena_saved_lists_by_category", JSON.stringify(allSaved));
+      } catch (e) {}
+
       this.checkRestoreButtonVisibility();
     }
   }
 
   checkRestoreButtonVisibility() {
-    if (!this.restoreBanner) return;
-    const cat = this.category || "singers";
-    let raw = localStorage.getItem(`ta5mena_last_list_${cat}`);
-    if (!raw) {
-      const fallback = localStorage.getItem("ta5mena_last_list");
-      if (fallback) {
-        try {
-          const parsed = JSON.parse(fallback);
-          if (!parsed.category || parsed.category === cat) {
-            raw = fallback;
-          }
-        } catch (e) {}
-      }
-    }
+    // Delete legacy flat key
+    try {
+      localStorage.removeItem("ta5mena_last_list");
+    } catch (e) {}
 
-    if (!raw) {
+    if (!this.restoreBanner) return;
+
+    const cat = (this.category || "singers").toLowerCase().trim();
+    if (cat === "custom") {
       this.restoreBanner.classList.add("hidden");
+      this.restoreBanner.style.display = "none";
       return;
     }
 
+    let allSaved = {};
     try {
-      const data = JSON.parse(raw);
-      const items = data.items || data;
-      const filled = Object.values(items).filter(v => typeof v === "string" && v.trim().length > 0);
-      if (filled.length > 0) {
-        const catKey = data.category || cat;
-        this.restoreCategoryLabel.textContent = this.getCategoryTitle(catKey).toUpperCase();
-        this.restoreBanner.classList.remove("hidden");
-      } else {
-        this.restoreBanner.classList.add("hidden");
-      }
-    } catch (e) {
+      const raw = localStorage.getItem("ta5mena_saved_lists_by_category");
+      if (raw) allSaved = JSON.parse(raw) || {};
+    } catch (e) {}
+
+    const savedCat = allSaved[cat];
+    if (!savedCat || !savedCat.items) {
       this.restoreBanner.classList.add("hidden");
+      this.restoreBanner.style.display = "none";
+      return;
+    }
+
+    const items = savedCat.items;
+    const filled = Object.values(items).filter(v => typeof v === "string" && v.trim().length > 0);
+    if (filled.length > 0) {
+      const catTitle = this.getCategoryTitle(cat).toUpperCase();
+      if (this.restoreCategoryLabel) {
+        this.restoreCategoryLabel.textContent = catTitle;
+      }
+      if (this.btnRestoreLastList) {
+        this.btnRestoreLastList.textContent = `RESTORE LAST ${catTitle} LIST`;
+      }
+      this.restoreBanner.classList.remove("hidden");
+      this.restoreBanner.style.display = "";
+    } else {
+      this.restoreBanner.classList.add("hidden");
+      this.restoreBanner.style.display = "none";
     }
   }
 
   restoreLastList() {
-    const cat = this.category || "singers";
-    let raw = localStorage.getItem(`ta5mena_last_list_${cat}`);
-    if (!raw) {
-      raw = localStorage.getItem("ta5mena_last_list");
-    }
-    if (!raw) return;
+    const cat = (this.category || "singers").toLowerCase().trim();
+    if (cat === "custom") return;
 
+    let allSaved = {};
     try {
-      const data = JSON.parse(raw);
-      const items = data.items || data;
+      const raw = localStorage.getItem("ta5mena_saved_lists_by_category");
+      if (raw) allSaved = JSON.parse(raw) || {};
+    } catch (e) {}
 
+    const savedCat = allSaved[cat];
+    if (!savedCat || !savedCat.items) return;
+
+    const items = savedCat.items;
+    for (let rank = 1; rank <= 10; rank++) {
+      const input = document.getElementById(`entry-slot-input-${rank}`);
+      if (input && items[rank] !== undefined) {
+        input.value = items[rank];
+        input.classList.add("slot-swap-flash");
+      }
+    }
+
+    setTimeout(() => {
       for (let rank = 1; rank <= 10; rank++) {
         const input = document.getElementById(`entry-slot-input-${rank}`);
-        if (input && items[rank] !== undefined) {
-          input.value = items[rank];
-        }
+        if (input) input.classList.remove("slot-swap-flash");
       }
+    }, 250);
 
-      this.backupSecretList();
-      const catTitle = this.getCategoryTitle(data.category || cat);
-      this.showAlert(`Restored your 10 picks for ${catTitle}!`);
-    } catch (err) {
-      console.warn("Failed to restore list:", err);
-    }
+    this.backupSecretList();
+    this.checkEmptySlotsCount();
+    if (this.entryErrorBanner) this.entryErrorBanner.classList.add("hidden");
+    const catTitle = this.getCategoryTitle(cat);
+    this.showAlert(`Restored your 10 picks for ${catTitle}!`);
   }
 
   updateEntryRosterStatus(room) {
@@ -5788,9 +6049,10 @@ class GameController {
           this.entryCategoryTitle.textContent = `${player.name}'s Top 10: ${catTitle}`;
         }
 
-        if (this.entrySlotsContainer.children.length === 0) {
+        if (this.entrySlotsContainer.children.length === 0 || this.lastBuiltCategory !== this.category) {
           this.buildEntrySlots();
         }
+        this.lastBuiltCategory = this.category;
 
         // Restore if player already saved draft
         const existingList = this.localMatch.lists[pid];
@@ -5801,9 +6063,10 @@ class GameController {
             input.value = (existingList && existingList[r]) ? existingList[r].item : "";
           }
         }
+        document.querySelectorAll(".btn-slot-action, .btn-slot-dice, .btn-slot-reorder").forEach(btn => btn.disabled = false);
 
-        if (this.restoreBanner) this.restoreBanner.classList.add("hidden");
         if (this.entryWaitingCard) this.entryWaitingCard.classList.add("hidden");
+        this.updateListBuilderControls();
 
         this.btnSubmitList.disabled = false;
         this.btnSubmitList.innerHTML = `

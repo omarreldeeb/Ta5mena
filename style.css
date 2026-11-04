@@ -643,6 +643,79 @@ header.app-header {
   color: var(--text-primary);
 }
 
+/* List Builder Toolbar (Dice Randomizer & Fill Empty) */
+.entry-builder-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.entry-toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.btn-randomize-all {
+  height: 36px;
+  padding: 0 12px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex: 1;
+}
+
+.btn-randomize-all:hover {
+  background-color: var(--accent);
+  color: #FFFFFF;
+  box-shadow: 0 0 12px rgba(255, 77, 0, 0.35);
+}
+
+.btn-fill-empty {
+  height: 36px;
+  padding: 0 10px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-fill-empty:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.icon-dice {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
 .slots-grid {
   display: flex;
   flex-direction: column;
@@ -651,24 +724,31 @@ header.app-header {
 
 .slot-row {
   display: grid;
-  grid-template-columns: 74px 1fr 64px;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+.slot-actions-group,
 .slot-reorder-group {
   display: flex;
   gap: 4px;
+  align-items: center;
   height: 44px;
+  flex-shrink: 0;
 }
 
-.btn-slot-reorder {
-  flex: 1;
+.btn-slot-action,
+.btn-slot-reorder,
+.btn-slot-dice {
   height: 44px;
-  min-width: 30px;
+  width: 36px;
+  min-width: 36px;
   padding: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: var(--bg-input);
@@ -677,21 +757,38 @@ header.app-header {
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.12s ease;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
-.btn-slot-reorder:hover:not(:disabled) {
+.btn-slot-reorder:hover:not(:disabled),
+.btn-slot-action:hover:not(:disabled) {
   border-color: var(--accent);
   background-color: #222222;
   color: var(--accent);
 }
 
-.btn-slot-reorder:disabled {
+.btn-slot-dice {
+  color: var(--accent);
+  border-color: rgba(255, 77, 0, 0.45);
+}
+
+.btn-slot-dice:hover:not(:disabled) {
+  border-color: var(--accent);
+  background-color: rgba(255, 77, 0, 0.18);
+  color: #FFFFFF;
+}
+
+.btn-slot-reorder:disabled,
+.btn-slot-action:disabled,
+.btn-slot-dice:disabled {
   opacity: 0.25;
   cursor: not-allowed;
   border-color: var(--border-subtle);
 }
 
-.btn-slot-reorder .icon-reorder {
+.btn-slot-reorder .icon-reorder,
+.btn-slot-action .icon-reorder {
   width: 14px;
   height: 14px;
 }
@@ -731,10 +828,13 @@ header.app-header {
 .slot-input-wrapper {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 
 .slot-input-wrapper input {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* ============================================================================
@@ -2727,12 +2827,82 @@ header.app-header {
     font-size: 11px;
     padding: 3px 10px;
   }
+  /* Mobile List Builder Slot Row & Actions (Fits cleanly on 360px) */
   .slot-row {
-    grid-template-columns: 56px 1fr 56px;
-    gap: 6px;
+    grid-template-columns: 46px minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
-  .btn-slot-reorder {
-    min-width: 26px;
+
+  .slot-rank-label {
+    height: 38px !important;
+    padding: 0 2px !important;
+    font-size: 11px !important;
+    width: 46px !important;
+    box-sizing: border-box !important;
+  }
+
+  .slot-rank-label .rank-pts {
+    font-size: 9px !important;
+  }
+
+  .slot-input-wrapper {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .slot-input-wrapper input {
+    height: 38px !important;
+    font-size: 13px !important;
+    padding: 0 8px !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .slot-actions-group,
+  .slot-reorder-group {
+    gap: 3px !important;
+    height: 38px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-slot-action,
+  .btn-slot-reorder,
+  .btn-slot-dice {
+    height: 38px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+  }
+
+  .icon-dice,
+  .icon-reorder {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .entry-toolbar-buttons {
+    display: flex !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .btn-randomize-all {
+    font-size: 11px !important;
+    height: 34px !important;
+    padding: 0 8px !important;
+    white-space: nowrap !important;
+  }
+
+  .btn-fill-empty {
+    font-size: 10px !important;
+    height: 34px !important;
+    padding: 0 6px !important;
+    white-space: nowrap !important;
   }
   .turn-timer-options-grid {
     grid-template-columns: repeat(3, 1fr);

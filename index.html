@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ta5mena | Real-Time Top 10 Party Game</title>
   <meta name="description" content="Ta5mena - Real-time online multiplayer party game. Guess your friends' Top 10 lists ranked from 1 to 10.">
-  <link rel="stylesheet" href="style.css?v=20261104b">
+  <link rel="stylesheet" href="style.css?v=20261104c">
 </head>
 <body>
   <div id="app-container">
@@ -402,7 +402,36 @@
           Opponents will guess your items to score points. No duplicate entries allowed.
         </div>
 
-        <div id="restore-banner" class="flex-between mt-8 hidden" style="background-color: var(--bg-input); padding: 8px 12px; border: 1px dashed var(--accent); border-radius: var(--radius);">
+        <!-- LIST BUILDER TOOLBAR (Randomize All & Fill Empty) -->
+        <div id="entry-builder-toolbar" class="entry-builder-toolbar mt-8">
+          <div class="entry-toolbar-buttons">
+            <button id="btn-randomize-all-slots" type="button" class="btn btn-sm btn-randomize-all" title="Randomly fill all 10 slots from category database">
+              <svg viewBox="0 0 24 24" class="icon-dice" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="4" ry="4"></rect>
+                <circle cx="7" cy="7" r="1.5" fill="currentColor"></circle>
+                <circle cx="17" cy="7" r="1.5" fill="currentColor"></circle>
+                <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                <circle cx="7" cy="17" r="1.5" fill="currentColor"></circle>
+                <circle cx="17" cy="17" r="1.5" fill="currentColor"></circle>
+              </svg>
+              <span>RANDOMIZE ALL 10</span>
+            </button>
+            <button id="btn-fill-empty-slots" type="button" class="btn btn-sm btn-fill-empty hidden" title="Fill empty slots with random items">
+              <svg viewBox="0 0 24 24" class="icon-dice" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="4" ry="4"></rect>
+                <circle cx="7" cy="7" r="1.5" fill="currentColor"></circle>
+                <circle cx="17" cy="7" r="1.5" fill="currentColor"></circle>
+                <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                <circle cx="7" cy="17" r="1.5" fill="currentColor"></circle>
+                <circle cx="17" cy="17" r="1.5" fill="currentColor"></circle>
+              </svg>
+              <span>FILL EMPTY</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RESTORE LAST CATEGORY LIST BANNER -->
+        <div id="restore-banner" class="flex-between mt-8 hidden" style="background-color: var(--bg-input); padding: 8px 12px; border: 1px dashed var(--accent); border-radius: var(--radius); flex-wrap: wrap; gap: 6px;">
           <span style="font-size: 12px; color: var(--text-secondary);">Saved backup found (<strong id="restore-category-label">SAVED</strong>)</span>
           <button id="btn-restore-last-list" type="button" class="btn btn-sm btn-primary" style="height: 28px; padding: 0 10px; font-size: 11px; font-family: var(--font-mono); font-weight: 700;">
             RESTORE LAST LIST
@@ -1108,7 +1137,7 @@
   </div>
 
   <!-- MODULE SCRIPTS -->
-  <script type="module" src="suggestions.js?v=20261104"></script>
-  <script type="module" src="app.js?v=20261104"></script>
+  <script type="module" src="suggestions.js?v=20261104c"></script>
+  <script type="module" src="app.js?v=20261104c"></script>
 </body>
 </html>
