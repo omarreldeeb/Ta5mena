@@ -2565,48 +2565,146 @@ header.app-header {
 }
 
 /* ============================================================================
-   MOBILE HEADER & SCREEN OVERFLOW LOCK (DOWN TO 360PX)
+   MOBILE HEADER, CALLOUTS 2X2 GRID & SCREEN OVERFLOW LOCK (<= 640PX)
    ============================================================================ */
-@media (max-width: 420px) {
+@media (max-width: 640px) {
+  /* Prevent horizontal blowout across root and child elements */
+  #app-container,
+  .app-container,
+  main,
+  .view-section,
+  .card,
+  .control-box {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
   #app-container {
-    padding: 8px 8px 20px;
-    max-width: 100vw;
-    overflow-x: hidden;
+    padding: 8px 10px 20px !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
-  header.app-header {
-    gap: 6px;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
+
+  /* Header Container */
+  header.app-header,
+  .app-header {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 8px !important;
   }
+
+  /* Logo Area */
+  .logo-area {
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .logo-mark {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
   .logo-title {
-    font-size: 15px;
+    font-size: 15px !important;
+    letter-spacing: 0 !important;
+    line-height: 1.1 !important;
   }
+
+  /* Hide the subtitle text "TOP 10" next to "TA5MENA" on mobile */
   .logo-sub {
-    font-size: 9px;
+    display: none !important;
   }
+
+  /* Header Meta Group */
   .header-meta {
-    gap: 4px;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    flex-wrap: nowrap !important;
   }
+
+  /* Speaker Mute Toggle Button */
+  #btn-sound-toggle,
+  .btn-sound-toggle {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    padding: 0 !important;
+    flex-shrink: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* HINTS and MY LIST Buttons */
+  #btn-header-hints,
   .btn-hints,
+  #btn-header-my-list,
   .btn-my-list {
-    padding: 2px 6px;
-    font-size: 11px;
-    height: 26px;
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    height: 30px !important;
+    box-sizing: border-box !important;
   }
+
+  /* Header Room Tag and Leave Button Stack */
   .header-room-stack {
-    min-width: 76px;
-    gap: 3px;
+    min-width: auto !important;
+    width: auto !important;
+    gap: 2px !important;
+    flex-shrink: 0 !important;
   }
+
   #header-room-tag,
   .room-tag,
   #btn-header-leave,
   .btn-header-leave-compact {
-    height: 24px !important;
-    min-height: 24px !important;
-    max-height: 24px !important;
+    padding: 3px 6px !important;
     font-size: 10px !important;
-    padding: 0 4px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
+    width: auto !important;
+    line-height: 1.1 !important;
   }
+
+  /* Tactical Callouts 2x2 Grid */
+  .callout-buttons-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .btn-callout {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 36px !important;
+  }
+
+  /* Mobile Adjustments for Score Rows and Reordering */
   .final-score-row {
     grid-template-columns: 28px 1fr auto;
     gap: 8px;
@@ -2639,10 +2737,6 @@ header.app-header {
   .turn-timer-options-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 4px;
-  }
-  .callout-buttons-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
   }
   .podium-awards-grid {
     grid-template-columns: 1fr;
