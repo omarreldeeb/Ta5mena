@@ -20,6 +20,17 @@
         </div>
       </div>
       <div class="header-meta">
+        <button id="btn-sound-toggle" type="button" class="btn btn-sm btn-sound-toggle" title="Toggle Sound" aria-label="Toggle Sound">
+          <svg class="icon icon-sound-on" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg class="icon icon-sound-off hidden" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
         <button id="btn-header-hints" type="button" class="btn btn-sm btn-hints hidden" title="Hints Hub">
           <svg class="icon icon-bulb" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18h6"></path>
@@ -216,6 +227,20 @@
                 ENTER CUSTOM TOPIC TITLE
               </label>
               <input type="text" id="input-local-custom-category-title" placeholder="e.g. Video Games, Anime, Restaurants..." maxlength="30" autocomplete="off">
+            <!-- Turn Timer Picker for Local Mode -->
+            <div class="turn-timer-picker-container mt-12">
+              <div class="flex-between mb-6">
+                <label style="font-weight: 700; font-size: 12px; color: var(--text-secondary);">TURN TIMER</label>
+                <span class="badge">OPTIONAL</span>
+              </div>
+              <div class="turn-timer-options-grid" id="local-timer-options-grid">
+                <button type="button" class="btn-timer-option selected" data-seconds="0">OFF</button>
+                <button type="button" class="btn-timer-option" data-seconds="30">30S</button>
+                <button type="button" class="btn-timer-option" data-seconds="45">45S</button>
+                <button type="button" class="btn-timer-option" data-seconds="60">60S</button>
+                <button type="button" class="btn-timer-option" data-seconds="90">90S</button>
+                <button type="button" class="btn-timer-option" data-seconds="120">120S</button>
+              </div>
             </div>
           </div>
 
@@ -313,6 +338,22 @@
               <button id="btn-save-custom-category" type="button" class="btn btn-primary btn-sm">Set Topic</button>
             </div>
             <div id="custom-category-display-note" class="text-secondary hidden" style="font-size: 11px; margin-top: 4px;"></div>
+          </div>
+
+          <!-- Turn Timer Picker for Online Lobby -->
+          <div class="turn-timer-picker-container mt-12">
+            <div class="flex-between mb-6">
+              <label style="font-weight: 700; font-size: 13px;">TURN TIMER</label>
+              <span id="turn-timer-badge-note" class="badge">HOST SELECTS</span>
+            </div>
+            <div class="turn-timer-options-grid" id="lobby-timer-options-grid">
+              <button type="button" class="btn-timer-option selected" data-seconds="0">OFF</button>
+              <button type="button" class="btn-timer-option" data-seconds="30">30S</button>
+              <button type="button" class="btn-timer-option" data-seconds="45">45S</button>
+              <button type="button" class="btn-timer-option" data-seconds="60">60S</button>
+              <button type="button" class="btn-timer-option" data-seconds="90">90S</button>
+              <button type="button" class="btn-timer-option" data-seconds="120">120S</button>
+            </div>
           </div>
         </div>
       </div>
@@ -416,36 +457,76 @@
         </div>
       </div>
 
+      <!-- HOST LAST STANDING CONTROLS (Host only, when only 1 player has hidden slots left) -->
+      <div id="host-last-standing-box" class="card host-last-standing-box hidden">
+        <div class="flex-between mb-8">
+          <div>
+            <span class="badge badge-accent">LAST PLAYER STANDING</span>
+            <div style="font-weight: 700; font-size: 14px; margin-top: 4px;">Only 1 Player Has Hidden Slots Left</div>
+          </div>
+          <span class="text-secondary mono" style="font-size: 11px;">HOST CONTROLS</span>
+        </div>
+        <div class="host-last-standing-buttons">
+          <button id="btn-toggle-auto-skip-last" type="button" class="btn btn-sm btn-block">
+            AUTO-SKIP LAST PLAYER'S TURNS: <span id="auto-skip-last-status">OFF</span>
+          </button>
+          <button id="btn-host-end-match-now" type="button" class="btn btn-sm btn-danger-outline btn-block">
+            END MATCH NOW &amp; GO TO PODIUM
+          </button>
+        </div>
+      </div>
+
       <!-- ACTIVE PLAYER GUESSING CONTROL BOX (When it's your turn) -->
       <div id="active-turn-control" class="control-box hidden">
         <div class="control-box-header">
           <span class="control-box-title" id="active-turn-control-title">YOUR TURN: GUESS AN OPPONENT'S ITEM</span>
           <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="turn-timer-badge" class="turn-timer-badge hidden">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span id="turn-timer-countdown">00:00</span>
+            </div>
             <button id="btn-active-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
             <span class="badge badge-accent">1 GUESS ONLY</span>
           </div>
         </div>
 
-        <div>
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">1. SELECT TARGET PLAYER</label>
-          <div id="target-player-grid" class="target-selector-grid">
-            <!-- Opponent buttons rendered here -->
+        <!-- Last Player Standing Pass Turn Banner -->
+        <div id="last-player-pass-banner" class="last-player-pass-banner hidden">
+          <div class="last-player-pass-notice">
+            Everyone else's list is complete! Passing turn so others can finish your list...
           </div>
-          <!-- Wrong guesses made against the selected target -->
-          <div id="target-missed-guesses-box" class="missed-guesses-box hidden mt-8">
-            <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
-            <div id="target-missed-guesses-list" class="missed-guesses-tags"></div>
+          <button id="btn-pass-my-turn" type="button" class="btn btn-primary btn-block">
+            PASS MY TURN
+          </button>
+        </div>
+
+        <div id="turn-guessing-fields">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">1. SELECT TARGET PLAYER</label>
+            <div id="target-player-grid" class="target-selector-grid">
+              <!-- Opponent buttons rendered here -->
+            </div>
+            <!-- Wrong guesses made against the selected target -->
+            <div id="target-missed-guesses-box" class="missed-guesses-box hidden mt-8">
+              <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
+              <div id="target-missed-guesses-list" class="missed-guesses-tags"></div>
+            </div>
+          </div>
+
+          <div style="position: relative;">
+            <label for="input-turn-guess" style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">2. TYPE GUESS (AUTOCOMPLETE OR FREE-TEXT)</label>
+            <div class="guess-input-row">
+              <input type="text" id="input-turn-guess" placeholder="Type a name..." autocomplete="off">
+              <button id="btn-submit-guess" class="btn btn-primary" disabled>Submit Guess</button>
+            </div>
+            <!-- Autocomplete dropdown for active guess -->
+            <div id="turn-autocomplete-dropdown" class="autocomplete-dropdown"></div>
           </div>
         </div>
 
-        <div style="position: relative;">
-          <label for="input-turn-guess" style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">2. TYPE GUESS (AUTOCOMPLETE OR FREE-TEXT)</label>
-          <div class="guess-input-row">
-            <input type="text" id="input-turn-guess" placeholder="Type a name..." autocomplete="off">
-            <button id="btn-submit-guess" class="btn btn-primary" disabled>Submit Guess</button>
-          </div>
-          <!-- Autocomplete dropdown for active guess -->
-          <div id="turn-autocomplete-dropdown" class="autocomplete-dropdown"></div>
+        <!-- Progress bar along bottom edge of Active Turn box -->
+        <div id="turn-timer-bar-wrapper" class="turn-timer-bar-wrapper hidden">
+          <div id="turn-timer-progress-bar" class="turn-timer-progress-bar"></div>
         </div>
       </div>
 
@@ -456,8 +537,16 @@
           <div class="passive-turn-text">Waiting for <strong id="passive-active-player-name">Player</strong> to guess...</div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
+          <div id="passive-timer-badge" class="turn-timer-badge hidden">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span id="passive-timer-countdown">00:00</span>
+          </div>
           <button id="btn-host-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
           <span class="badge">IN PROGRESS</span>
+        </div>
+        <!-- Progress bar along bottom edge of passive banner -->
+        <div id="passive-timer-bar-wrapper" class="turn-timer-bar-wrapper hidden">
+          <div id="passive-timer-progress-bar" class="turn-timer-progress-bar"></div>
         </div>
       </div>
 
@@ -498,6 +587,23 @@
           <!-- Mini score badges -->
         </div>
       </div>
+
+      <!-- TACTICAL CALLOUT BAR (Emoji-Free Kinetic Stamps) -->
+      <div id="game-callout-bar" class="card callout-bar-card">
+        <div class="flex-between" style="margin-bottom: 8px;">
+          <span style="font-weight: 700; font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);">TACTICAL CALLOUTS</span>
+          <span id="callout-cooldown-badge" class="badge" style="font-size: 10px; display: none;">COOLDOWN</span>
+        </div>
+        <div class="callout-buttons-grid">
+          <button type="button" class="btn btn-callout" data-callout="SNIPED">[ SNIPED ]</button>
+          <button type="button" class="btn btn-callout" data-callout="HOW?!">[ HOW?! ]</button>
+          <button type="button" class="btn btn-callout" data-callout="HURRY UP">[ HURRY UP ]</button>
+          <button type="button" class="btn btn-callout" data-callout="TOO EASY">[ TOO EASY ]</button>
+        </div>
+      </div>
+
+      <!-- KINETIC TYPOGRAPHY STAMP DISPLAY -->
+      <div id="callout-stamp-container" class="callout-stamp-container hidden" aria-live="polite"></div>
     </section>
 
     <!-- ===================================================================== -->
@@ -553,6 +659,17 @@
         <h2 style="font-size: 20px;">FINAL RESULTS</h2>
         <div id="podium-winner-name" class="winner-highlight">Player Name</div>
         <p class="text-secondary" style="font-size: 13px;">Ranked by points with total correct guesses as tiebreaker.</p>
+      </div>
+
+      <!-- Post-Game Award Titles -->
+      <div id="podium-awards-card" class="card">
+        <div class="flex-between" style="margin-bottom: 10px;">
+          <span style="font-weight: 700; font-size: 13px;">MATCH AWARDS &amp; HONORS</span>
+          <span class="text-secondary" style="font-size: 11px; font-family: var(--font-mono);">TOP PERFORMERS</span>
+        </div>
+        <div id="podium-awards-container" class="podium-awards-grid">
+          <!-- Award badges rendered dynamically -->
+        </div>
       </div>
 
       <!-- Final Leaderboard -->
@@ -783,7 +900,7 @@
       <div class="confirm-modal-box sharp-modal-box" style="max-width: 440px;">
         <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">💡 HINT REQUEST</span>
+            <span class="badge" style="color: #FFD700; border-color: #FFD700; font-weight: 800;">HINT REQUEST</span>
             <span class="mono text-secondary" style="font-size: 11px;">INCOMING</span>
           </div>
         </div>
@@ -861,7 +978,7 @@
     <div id="modal-privacy-curtain" class="modal-backdrop modal-privacy-backdrop hidden">
       <div class="privacy-curtain-card">
         <button id="btn-privacy-curtain-cancel" type="button" class="privacy-curtain-cancel-btn" title="Cancel and return to Home Screen">
-          ✕ EXIT TO HOME
+          EXIT TO HOME
         </button>
         <span class="badge badge-accent mb-12" style="font-weight: 800; letter-spacing: 0.5px;">1-DEVICE PASS & PLAY</span>
         <div class="privacy-curtain-icon-wrap">
@@ -925,7 +1042,7 @@
 
         <!-- Option B: Secret Verification Button -->
         <button id="btn-local-verify-secret-pass" type="button" class="btn btn-primary btn-block" style="padding: 12px 14px; height: auto;">
-          <div style="font-weight: 800; font-size: 14px;">🔒 PASS TO <span id="local-verify-secret-target-btn-label">TARGET</span> TO VERIFY SECRETLY</div>
+          <div style="font-weight: 800; font-size: 14px;">PASS TO <span id="local-verify-secret-target-btn-label">TARGET</span> TO VERIFY SECRETLY</div>
           <div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">Hides screen and lets target secretly tap their matching slot or say no</div>
         </button>
 

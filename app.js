@@ -269,7 +269,161 @@ class DatabaseService {
   }
 }
 
-const db = new DatabaseService();
+// ============================================================================
+// SOUND ENGINE: WARM, SUBTLE, NON-HARSH WEB AUDIO SYNTHESIS
+// Soft sine/triangle waves with 1100Hz lowpass filter & gentle envelopes (max gain 0.12)
+// Strictly ZERO emojis, zero harsh/robotic square waves
+// ============================================================================
+
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.isMuted = localStorage.getItem("ta5mena_sound_muted") === "true";
+  }
+
+  ensureContext() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+      }
+    }
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
+    return this.ctx;
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    localStorage.setItem("ta5mena_sound_muted", this.isMuted ? "true" : "false");
+    return this.isMuted;
+  }
+
+  playTone(freq, duration = 0.15, type = "sine", gainVal = 0.09, startTime = null, filterFreq = 1100) {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    const t = startTime !== null ? startTime : ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(filterFreq, t);
+
+    // Warm, gentle attack (12ms) and exponential decay envelope
+    gainNode.gain.setValueAtTime(0.0001, t);
+    gainNode.gain.exponentialRampToValueAtTime(Math.min(gainVal, 0.12), t + 0.012);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  // 1. Your Turn Starts: Soft, warm two-note marimba tap (F4 -> A4, 120ms each) + vibration
+  playTurnStart() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.playTone(349.23, 0.12, "sine", 0.09, t, 1100);       // F4
+    this.playTone(440.00, 0.14, "triangle", 0.08, t + 0.11, 1100); // A4
+    if (navigator && navigator.vibrate) {
+      try { navigator.vibrate(80); } catch (e) {}
+    }
+  }
+
+  // 2. Correct Guess (1-7 pts): Warm acoustic-style major triad pluck (C5 - E5 - G5 staggered by 45ms)
+  playStandardCorrect() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.playTone(523.25, 0.20, "sine", 0.09, t, 1100);          // C5
+    this.playTone(659.25, 0.22, "sine", 0.085, t + 0.045, 1100);  // E5
+    this.playTone(783.99, 0.28, "triangle", 0.08, t + 0.090, 1100);// G5
+  }
+
+  // 3. High-Value Sniper Guess (8-10 pts): Smooth, rich Rhodes-style 5-note ascending chord
+  playSniperCorrect() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.playTone(523.25, 0.32, "sine", 0.09, t, 1100);           // C5
+    this.playTone(659.25, 0.35, "sine", 0.085, t + 0.05, 1100);   // E5
+    this.playTone(783.99, 0.38, "sine", 0.08, t + 0.10, 1100);    // G5
+    this.playTone(987.77, 0.42, "triangle", 0.075, t + 0.15, 1100);// B5
+    this.playTone(1174.66, 0.48, "sine", 0.07, t + 0.20, 1100);  // D6
+  }
+
+  // 4. Missed Guess: Quiet, muted low wooden thud (140Hz -> 95Hz filtered triangle wave, 150ms)
+  playMiss() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(95, t + 0.15);
+
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(320, t);
+
+    gainNode.gain.setValueAtTime(0.0001, t);
+    gainNode.gain.exponentialRampToValueAtTime(0.08, t + 0.015);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.20);
+  }
+
+  // 5. Timer Low (Last 5 seconds): Barely-audible soft woodblock tick once per second
+  playTimerTick() {
+    if (this.isMuted) return;
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(820, t);
+    osc.frequency.exponentialRampToValueAtTime(540, t + 0.035);
+
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(950, t);
+
+    gainNode.gain.setValueAtTime(0.0001, t);
+    gainNode.gain.exponentialRampToValueAtTime(0.045, t + 0.005);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.05);
+  }
+}
 
 // ============================================================================
 // GAME CLIENT STATE & CONTROLLER
@@ -283,6 +437,20 @@ class GameController {
     this.isHost = false;
     this.roomData = null;
     this.roomUnsubscribe = null;
+
+    // Sound Engine
+    this.soundEngine = new SoundEngine();
+    this.lastActiveTurnPlayerId = null;
+    this.lastTickSecond = null;
+    this.isHandlingTimeout = false;
+    this.timerTickInterval = null;
+
+    // Tactical Callout state
+    this.lastCalloutTime = 0;
+    this.lastRenderedCalloutTime = 0;
+
+    // Turn Timer state
+    this.localTurnTimer = 0; // seconds, 0 = OFF
 
     // UI state
     this.selectedTargetId = null;
@@ -328,6 +496,7 @@ class GameController {
     this.bindEvents();
     this.initAppRouting();
     this.startLivenessCheck();
+    this.startTimerTicker();
   }
 
   cacheDomElements() {
@@ -562,6 +731,41 @@ class GameController {
     this.localSecretSlotsGuessText = document.getElementById("local-secret-slots-guess-text");
     this.localSecretSlotsList = document.getElementById("local-secret-slots-list");
     this.btnLocalSecretSlotsWrong = document.getElementById("btn-local-secret-slots-wrong");
+
+    // Sound Toggle Button
+    this.btnSoundToggle = document.getElementById("btn-sound-toggle");
+
+    // Turn Timer Elements
+    this.turnTimerBadge = document.getElementById("turn-timer-badge");
+    this.turnTimerCountdown = document.getElementById("turn-timer-countdown");
+    this.turnTimerBarWrapper = document.getElementById("turn-timer-bar-wrapper");
+    this.turnTimerProgressBar = document.getElementById("turn-timer-progress-bar");
+    this.passiveTimerBadge = document.getElementById("passive-timer-badge");
+    this.passiveTimerCountdown = document.getElementById("passive-timer-countdown");
+    this.passiveTimerBarWrapper = document.getElementById("passive-timer-bar-wrapper");
+    this.passiveTimerProgressBar = document.getElementById("passive-timer-progress-bar");
+    this.lobbyTimerOptions = document.querySelectorAll("#lobby-timer-options-grid .btn-timer-option");
+    this.localTimerOptions = document.querySelectorAll("#local-timer-options-grid .btn-timer-option");
+    this.turnTimerBadgeNote = document.getElementById("turn-timer-badge-note");
+
+    // Host Last Standing Controls & Pass Banner
+    this.hostLastStandingBox = document.getElementById("host-last-standing-box");
+    this.btnToggleAutoSkipLast = document.getElementById("btn-toggle-auto-skip-last");
+    this.autoSkipLastStatus = document.getElementById("auto-skip-last-status");
+    this.btnHostEndMatchNow = document.getElementById("btn-host-end-match-now");
+    this.lastPlayerPassBanner = document.getElementById("last-player-pass-banner");
+    this.btnPassMyTurn = document.getElementById("btn-pass-my-turn");
+    this.turnGuessingFields = document.getElementById("turn-guessing-fields");
+
+    // Tactical Callout Bar & Stamp
+    this.gameCalloutBar = document.getElementById("game-callout-bar");
+    this.btnCallouts = document.querySelectorAll(".btn-callout");
+    this.calloutStampContainer = document.getElementById("callout-stamp-container");
+    this.calloutCooldownBadge = document.getElementById("callout-cooldown-badge");
+
+    // Podium Awards
+    this.podiumAwardsCard = document.getElementById("podium-awards-card");
+    this.podiumAwardsContainer = document.getElementById("podium-awards-container");
   }
 
   bindEvents() {
@@ -828,6 +1032,45 @@ class GameController {
         document.querySelectorAll(".autocomplete-dropdown").forEach(el => el.classList.remove("open"));
       }
     });
+
+    // Sound Toggle & Context Unlock
+    this.updateSoundToggleUi();
+    this.btnSoundToggle?.addEventListener("click", () => this.toggleSound());
+    document.addEventListener("pointerdown", () => this.soundEngine.ensureContext(), { once: true });
+    document.addEventListener("keydown", () => this.soundEngine.ensureContext(), { once: true });
+
+    // Lobby Turn Timer Selector
+    this.lobbyTimerOptions.forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!this.isHost) return;
+        const seconds = parseInt(btn.dataset.seconds, 10) || 0;
+        this.setRoomTurnTimer(seconds);
+      });
+    });
+
+    // Local Turn Timer Selector
+    this.localTimerOptions.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const seconds = parseInt(btn.dataset.seconds, 10) || 0;
+        this.setLocalTurnTimer(seconds);
+      });
+    });
+
+    // Last Player Standing Controls & Pass Turn
+    this.btnPassMyTurn?.addEventListener("click", () => {
+      if (this.isLocalMode) {
+        this.advanceLocalTurn();
+      } else {
+        this.advanceTurn();
+      }
+    });
+    this.btnToggleAutoSkipLast?.addEventListener("click", () => this.toggleAutoSkipLastPlayer());
+    this.btnHostEndMatchNow?.addEventListener("click", () => this.hostEndMatchNow());
+
+    // Tactical Callouts
+    this.btnCallouts.forEach(btn => {
+      btn.addEventListener("click", () => this.sendCallout(btn.dataset.callout));
+    });
   }
 
   // ==========================================================================
@@ -835,6 +1078,7 @@ class GameController {
   // ==========================================================================
 
   switchView(viewName) {
+    this.currentView = viewName;
     Object.values(this.views).forEach(el => el.classList.remove("active"));
     if (this.views[viewName]) {
       this.views[viewName].classList.add("active");
@@ -1334,6 +1578,20 @@ class GameController {
     }, 60000);
   }
 
+  startTimerTicker() {
+    if (this.timerTickInterval) clearInterval(this.timerTickInterval);
+    this.timerTickInterval = setInterval(() => {
+      this.updateCalloutCooldownUi();
+      const isGameActive = (this.currentView === "game") || (this.views.game && this.views.game.classList.contains("active"));
+      if (isGameActive) {
+        const room = this.isLocalMode ? this.localMatch : this.roomData;
+        if (room && room.meta?.status === "playing") {
+          this.renderTurnTimer(room);
+        }
+      }
+    }, 200);
+  }
+
   // ==========================================================================
   // ROOM CREATION & JOINING
   // ==========================================================================
@@ -1374,6 +1632,8 @@ class GameController {
         code: roomCode,
         hostId: playerId,
         category: "singers",
+        turnTimer: 0,
+        autoSkipLastPlayer: false,
         status: "lobby",
         createdAt: Date.now()
       },
@@ -2493,7 +2753,7 @@ class GameController {
           : `<span class="mono text-secondary" style="white-space: nowrap; font-size: 10px;">NO HINT</span>`;
 
         const targetBadge = isRequestedTarget
-          ? `<span class="badge" style="background: rgba(255, 215, 0, 0.25); color: #FFD700; border: 1px solid #FFD700; font-weight: 800; font-size: 10px; margin-left: 4px; white-space: nowrap;">🎯 TARGET</span>`
+          ? `<span class="badge" style="background: rgba(255, 215, 0, 0.25); color: #FFD700; border: 1px solid #FFD700; font-weight: 800; font-size: 10px; margin-left: 4px; white-space: nowrap;">[TARGET]</span>`
           : "";
 
         card.innerHTML = `
@@ -2839,6 +3099,18 @@ class GameController {
       this.categoryBadgeNote.textContent = "HOST SELECTION";
     }
 
+    // Turn Timer selector in lobby
+    const currentTimer = Number(room.meta?.turnTimer) || 0;
+    this.lobbyTimerOptions.forEach(btn => {
+      const sec = parseInt(btn.dataset.seconds, 10) || 0;
+      btn.classList.toggle("selected", sec === currentTimer);
+      btn.disabled = !this.isHost;
+      btn.style.cursor = this.isHost ? "pointer" : "default";
+    });
+    if (this.turnTimerBadgeNote) {
+      this.turnTimerBadgeNote.textContent = this.isHost ? "HOST SELECTS" : "HOST SELECTION";
+    }
+
     // Render roster
     const hostId = this.getRoomHostId(room);
     this.lobbyPlayerList.innerHTML = "";
@@ -3105,6 +3377,7 @@ class GameController {
     for (let rank = 1; rank <= 10; rank++) {
       const row = document.createElement("div");
       row.className = "slot-row";
+      row.dataset.rank = rank;
       row.innerHTML = `
         <div class="slot-rank-label">
           <span class="rank-num">#${rank}</span>
@@ -3114,6 +3387,14 @@ class GameController {
           <input type="text" id="entry-slot-input-${rank}" placeholder="Rank #${rank} (${rank} ${rank === 1 ? 'pt' : 'pts'})" autocomplete="off">
           <div id="autocomplete-slot-${rank}" class="autocomplete-dropdown"></div>
         </div>
+        <div class="slot-reorder-group">
+          <button type="button" class="btn-slot-reorder btn-slot-up" data-rank="${rank}" title="Move Up" ${rank === 1 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" class="icon-reorder" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button type="button" class="btn-slot-reorder btn-slot-down" data-rank="${rank}" title="Move Down" ${rank === 10 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" class="icon-reorder" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
       `;
       this.entrySlotsContainer.appendChild(row);
 
@@ -3121,7 +3402,38 @@ class GameController {
       const dropdown = row.querySelector(`#autocomplete-slot-${rank}`);
       input.addEventListener("input", () => this.backupSecretList());
       this.setupAutocomplete(input, dropdown);
+
+      const btnUp = row.querySelector(".btn-slot-up");
+      const btnDown = row.querySelector(".btn-slot-down");
+
+      btnUp?.addEventListener("click", () => this.swapEntrySlots(rank, rank - 1));
+      btnDown?.addEventListener("click", () => this.swapEntrySlots(rank, rank + 1));
     }
+  }
+
+  swapEntrySlots(rankA, rankB) {
+    if (rankA < 1 || rankA > 10 || rankB < 1 || rankB > 10) return;
+    const inputA = document.getElementById(`entry-slot-input-${rankA}`);
+    const inputB = document.getElementById(`entry-slot-input-${rankB}`);
+    if (!inputA || !inputB) return;
+
+    const valA = inputA.value;
+    inputA.value = inputB.value;
+    inputB.value = valA;
+
+    inputA.classList.add("slot-swap-flash");
+    inputB.classList.add("slot-swap-flash");
+    setTimeout(() => {
+      inputA.classList.remove("slot-swap-flash");
+      inputB.classList.remove("slot-swap-flash");
+    }, 150);
+
+    document.querySelectorAll(".autocomplete-dropdown.open").forEach(d => {
+      d.classList.remove("open");
+      d.innerHTML = "";
+    });
+
+    this.backupSecretList();
   }
 
   setupAutocomplete(inputElement, dropdownElement) {
@@ -3366,6 +3678,7 @@ class GameController {
         "game/turnOrder": playerIds,
         "game/currentTurnIndex": 0,
         "game/activePlayerId": playerIds[0],
+        "game/turnStartedAt": Date.now(),
         "game/round": 1,
         "game/lastAction": {
           text: `Match started! ${room.players[playerIds[0]].name}'s turn to guess.`,
@@ -3409,8 +3722,60 @@ class GameController {
     // Check for Active Layer 3 Confirmation Modal
     this.handleConfirmationState(room);
 
-    // Active vs Passive Turn Control
+    // Turn Start Sound Effect trigger
+    if (activePlayerId !== this.lastActiveTurnPlayerId) {
+      this.lastActiveTurnPlayerId = activePlayerId;
+      if (this.isLocalMode || isMyTurn) {
+        this.soundEngine.playTurnStart();
+      }
+    }
 
+    // Turn Timer runtime render
+    this.renderTurnTimer(room);
+
+    // Last Player Standing detection
+    const hiddenPlayers = this.getPlayersWithHiddenSlots(room);
+    const isLastStanding = (hiddenPlayers.length === 1);
+    const solePlayer = isLastStanding ? hiddenPlayers[0] : null;
+
+    // Host controls for Last Player Standing
+    if (this.hostLastStandingBox) {
+      const canShowHostControls = (this.isHost || this.isLocalMode) && isLastStanding;
+      this.hostLastStandingBox.classList.toggle("hidden", !canShowHostControls);
+      if (canShowHostControls) {
+        const isAutoSkip = (room.meta?.autoSkipLastPlayer === true);
+        if (this.autoSkipLastStatus) {
+          this.autoSkipLastStatus.textContent = isAutoSkip ? "ON" : "OFF";
+          this.autoSkipLastStatus.style.color = isAutoSkip ? "var(--success)" : "var(--danger)";
+        }
+      }
+    }
+
+    // Sole remaining player turn pass banner vs regular guessing
+    const isSoleTurn = (isLastStanding && solePlayer && activePlayerId === solePlayer.id);
+    if (isSoleTurn) {
+      if (this.lastPlayerPassBanner) {
+        this.lastPlayerPassBanner.classList.remove("hidden");
+      }
+      if (this.turnGuessingFields) {
+        this.turnGuessingFields.classList.add("hidden");
+      }
+    } else {
+      if (this.lastPlayerPassBanner) {
+        this.lastPlayerPassBanner.classList.add("hidden");
+      }
+      if (this.turnGuessingFields) {
+        this.turnGuessingFields.classList.remove("hidden");
+      }
+    }
+
+    // Tactical Callout detection
+    if (room.lastCallout && room.lastCallout.timestamp && room.lastCallout.timestamp > this.lastRenderedCalloutTime) {
+      this.lastRenderedCalloutTime = room.lastCallout.timestamp;
+      this.displayCalloutStamp(room.lastCallout.senderName, room.lastCallout.callout);
+    }
+
+    // Active vs Passive Turn Control
     if (this.isLocalMode) {
       this.activeTurnControl.classList.remove("hidden");
       this.passiveTurnBanner.classList.add("hidden");
@@ -3420,7 +3785,9 @@ class GameController {
         this.activeTurnControlTitle.textContent = `CURRENT TURN: ${activeName.toUpperCase()}`;
       }
       this.btnActiveSkipTurn?.classList.remove("hidden");
-      this.renderTargetPlayerSelector(room);
+      if (!isSoleTurn) {
+        this.renderTargetPlayerSelector(room);
+      }
     } else if (isMyTurn) {
       this.activeTurnControl.classList.remove("hidden");
       this.passiveTurnBanner.classList.add("hidden");
@@ -3428,7 +3795,9 @@ class GameController {
         this.activeTurnControlTitle.textContent = "YOUR TURN: GUESS AN OPPONENT'S ITEM";
       }
       this.btnActiveSkipTurn?.classList.add("hidden");
-      this.renderTargetPlayerSelector(room);
+      if (!isSoleTurn) {
+        this.renderTargetPlayerSelector(room);
+      }
     } else {
       this.activeTurnControl.classList.add("hidden");
       this.passiveTurnBanner.classList.remove("hidden");
@@ -3476,8 +3845,9 @@ class GameController {
       nextRound += 1;
     }
 
+    const autoSkipEnabled = (this.roomData.meta?.autoSkipLastPlayer === true);
     let attempts = 0;
-    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
+    while (attempts < turnOrder.length && autoSkipEnabled && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
       nextIndex = (nextIndex + 1) % turnOrder.length;
       if (nextIndex === 0) nextRound += 1;
       attempts++;
@@ -3499,6 +3869,7 @@ class GameController {
         type: "skip",
         timestamp: Date.now()
       },
+      "game/turnStartedAt": Date.now(),
       "lastActivity": Date.now()
     };
 
@@ -3577,7 +3948,7 @@ class GameController {
       btn.className = `target-btn target-player-btn ${isSelected ? 'selected active' : ''} ${isCompleted ? 'disabled' : ''}`;
       btn.dataset.playerId = id;
 
-      const badgeText = isCompleted ? 'DONE' : (isSelected ? 'SELECTED ✓' : 'TARGET');
+      const badgeText = isCompleted ? 'DONE' : (isSelected ? 'SELECTED [ACTIVE]' : 'TARGET');
       const badgeStyle = isSelected ? 'style="color: #FF4D00; font-weight: 800; font-size: 11px;"' : 'style="font-size: 11px;"';
 
       btn.innerHTML = `
@@ -3608,7 +3979,7 @@ class GameController {
                 badge.style.color = "";
                 badge.style.fontWeight = "";
               } else if (isThisOne) {
-                badge.textContent = "SELECTED ✓";
+                badge.textContent = "SELECTED [ACTIVE]";
                 badge.style.color = "#FF4D00";
                 badge.style.fontWeight = "800";
               } else {
@@ -3845,6 +4216,13 @@ class GameController {
     const guesserId = guesserPlayer.id || this.myPlayerId;
     const newGuesserGuesses = (guesserPlayer.correctGuesses || 0) + 1;
 
+    // Trigger sound effect based on slot value
+    if (pointsAwarded >= 8) {
+      this.soundEngine.playSniperCorrect();
+    } else {
+      this.soundEngine.playStandardCorrect();
+    }
+
     const updates = {};
     updates[`lists/${targetPlayerId}/${slot.rank}/revealed`] = true;
     updates[`lists/${targetPlayerId}/${slot.rank}/guessedBy`] = guesserPlayer.name;
@@ -3870,9 +4248,10 @@ class GameController {
     }
 
     // If candidate has no valid opponents with unrevealed picks left to guess on,
-    // advance to next player who CAN target someone.
+    // only auto-skip if Host has toggled autoSkipLastPlayer ON
+    const autoSkipEnabled = (this.roomData.meta?.autoSkipLastPlayer === true);
     let attempts = 0;
-    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
+    while (attempts < turnOrder.length && autoSkipEnabled && this.hasNoValidTargets(turnOrder[nextIndex], this.roomData)) {
       nextIndex = (nextIndex + 1) % turnOrder.length;
       if (nextIndex === 0) {
         nextRound += 1;
@@ -3886,6 +4265,7 @@ class GameController {
       currentTurnIndex: nextIndex,
       activePlayerId: nextActivePlayerId,
       round: nextRound,
+      turnStartedAt: Date.now(),
       confirmation: null
     });
   }
@@ -3988,6 +4368,12 @@ class GameController {
       const newGuesses = (guesserPlayer.correctGuesses || 0) + 1;
       const actionText = `${confirmation.fromPlayerName} guessed '${slot.item}' on ${confirmation.toPlayerName}'s list (+${points} pts)`;
 
+      if (points >= 8) {
+        this.soundEngine.playSniperCorrect();
+      } else {
+        this.soundEngine.playStandardCorrect();
+      }
+
       const updates = {};
       updates[`lists/${this.myPlayerId}/${confirmedRank}/revealed`] = true;
       updates[`lists/${this.myPlayerId}/${confirmedRank}/guessedBy`] = confirmation.fromPlayerName;
@@ -4001,6 +4387,7 @@ class GameController {
       await db.update(`rooms/${this.currentRoomCode}`, updates);
     } else {
       // Missed guess ("Not on my list")
+      this.soundEngine.playMiss();
       const actionText = `${confirmation.fromPlayerName} missed on ${confirmation.toPlayerName}'s list (0 pts)`;
       const guessText = confirmation.guessText;
       const targetId = confirmation.toPlayerId;
@@ -4207,7 +4594,7 @@ class GameController {
           const hint = targetHints[r];
           const bulbSvg = `<svg class="icon icon-bulb" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 2px;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"/></svg>`;
           const hintBadge = hint
-            ? `<span class="board-slot-hint-bright">${bulbSvg} 💡 HINT: ${this.escapeHtml(hint.text)}</span>`
+            ? `<span class="board-slot-hint-bright">${bulbSvg} HINT: ${this.escapeHtml(hint.text)}</span>`
             : '';
 
           itemEl.innerHTML = `
@@ -4351,12 +4738,23 @@ class GameController {
     });
 
     const winner = players[0];
+    const awards = this.calculatePostGameAwards(room);
+    this.renderPodiumAwards(awards);
+
     if (winner) {
       const winnerGuesses = this.getPlayerCorrectGuesses(winner, lists);
       const winnerGuessLabel = winnerGuesses === 1 ? "1 GUESS" : `${winnerGuesses} GUESSES`;
+      const winnerAwards = awards.filter(a => a.playerId === winner.id);
+      let winnerAwardsHtml = "";
+      if (winnerAwards.length > 0) {
+        winnerAwardsHtml = `<div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 6px;">` +
+          winnerAwards.map(a => `<span class="player-award-pill">${a.svg} ${this.escapeHtml(a.title)}</span>`).join("") +
+          `</div>`;
+      }
       this.podiumWinnerName.innerHTML = `
         <span class="winner-name-text">${this.escapeHtml(winner.name)}</span>
         <span class="winner-stats-pill">${winner.points || 0} PTS • ${winnerGuessLabel}</span>
+        ${winnerAwardsHtml}
       `;
     } else {
       this.podiumWinnerName.textContent = "No Winner";
@@ -4368,11 +4766,17 @@ class GameController {
       const pGuesses = this.getPlayerCorrectGuesses(p, lists);
       const guessLabel = pGuesses === 1 ? "1 GUESS" : `${pGuesses} GUESSES`;
       const isYou = (!this.isLocalMode && p.id === this.myPlayerId);
+      const playerAwards = awards.filter(a => a.playerId === p.id);
+      let awardBadgesHtml = "";
+      playerAwards.forEach(a => {
+        awardBadgesHtml += `<span class="player-award-pill" title="${this.escapeHtml(a.desc)}">${a.svg} ${this.escapeHtml(a.title)}</span>`;
+      });
+
       const row = document.createElement("div");
       row.className = `final-score-row ${idx === 0 ? 'rank-1' : ''}`;
       row.innerHTML = `
         <span class="rank-pos">#${idx + 1}</span>
-        <span class="player-label" title="${this.escapeHtml(p.name)}">${this.escapeHtml(p.name)} ${isYou ? '<span class="you-badge">(You)</span>' : ''}</span>
+        <span class="player-label" title="${this.escapeHtml(p.name)}">${this.escapeHtml(p.name)} ${isYou ? '<span class="you-badge">(You)</span>' : ''} ${awardBadgesHtml}</span>
         <span class="score-value">
           <span class="score-pts">${p.points || 0} PTS</span>
           <span class="score-sep">•</span>
@@ -4455,6 +4859,490 @@ class GameController {
     });
 
     await db.update(`rooms/${this.currentRoomCode}`, updates);
+  }
+
+  // ==========================================================================
+  // POST-GAME AWARDS & HONORS (ZERO EMOJIS, CLEAN TYPOGRAPHY & SVGS)
+  // ==========================================================================
+
+  calculatePostGameAwards(room) {
+    if (!room || !room.players || !room.lists) return [];
+    const players = Object.values(room.players);
+    const lists = room.lists || {};
+    if (players.length === 0) return [];
+
+    const awards = [];
+
+    const sniperSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>`;
+    const fortressSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+    const scavengerSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`;
+    const accurateSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`;
+
+    // 1. THE SNIPER: player who guessed the most high-value (#8, #9, #10) slots
+    let maxSniper = 0;
+    let sniperWinner = null;
+    players.forEach(p => {
+      const pName = (p.name || "").trim().toLowerCase();
+      let sniperHits = 0;
+      Object.values(lists).forEach(list => {
+        if (!list) return;
+        for (let r = 8; r <= 10; r++) {
+          const slot = list[r];
+          if (!slot || !slot.revealed) continue;
+          if ((slot.guessedById && slot.guessedById === p.id) || (slot.guessedBy && slot.guessedBy.trim().toLowerCase() === pName)) {
+            sniperHits++;
+          }
+        }
+      });
+      if (sniperHits > maxSniper) {
+        maxSniper = sniperHits;
+        sniperWinner = p;
+      }
+    });
+
+    if (sniperWinner && maxSniper > 0) {
+      awards.push({
+        id: "sniper",
+        title: "THE SNIPER",
+        desc: `Guessed ${maxSniper} high-value slots (#8-#10)`,
+        playerId: sniperWinner.id,
+        playerName: sniperWinner.name,
+        metric: `${maxSniper} high-value hits (#8-#10)`,
+        svg: sniperSvg
+      });
+    }
+
+    // 2. IRON FORTRESS: player whose list survived longest / fewest items guessed
+    let maxSurvived = -1;
+    let fortressWinner = null;
+    players.forEach(p => {
+      const pList = lists[p.id] || {};
+      let unrevealedCount = 0;
+      for (let r = 1; r <= 10; r++) {
+        if (!pList[r] || !pList[r].revealed) {
+          unrevealedCount++;
+        }
+      }
+      if (unrevealedCount > maxSurvived) {
+        maxSurvived = unrevealedCount;
+        fortressWinner = p;
+      }
+    });
+
+    if (fortressWinner) {
+      const metricText = maxSurvived > 0
+        ? `${maxSurvived}/10 slots survived unguessed`
+        : "List held out longest under pressure";
+      awards.push({
+        id: "fortress",
+        title: "IRON FORTRESS",
+        desc: "List survived longest against opponent guesses",
+        playerId: fortressWinner.id,
+        playerName: fortressWinner.name,
+        metric: metricText,
+        svg: fortressSvg
+      });
+    }
+
+    // 3. THE SCAVENGER: player who guessed the most low-value (#1, #2, #3) slots
+    let maxScavenger = 0;
+    let scavengerWinner = null;
+    players.forEach(p => {
+      const pName = (p.name || "").trim().toLowerCase();
+      let scavengerHits = 0;
+      Object.values(lists).forEach(list => {
+        if (!list) return;
+        for (let r = 1; r <= 3; r++) {
+          const slot = list[r];
+          if (!slot || !slot.revealed) continue;
+          if ((slot.guessedById && slot.guessedById === p.id) || (slot.guessedBy && slot.guessedBy.trim().toLowerCase() === pName)) {
+            scavengerHits++;
+          }
+        }
+      });
+      if (scavengerHits > maxScavenger) {
+        maxScavenger = scavengerHits;
+        scavengerWinner = p;
+      }
+    });
+
+    if (scavengerWinner && maxScavenger > 0) {
+      awards.push({
+        id: "scavenger",
+        title: "THE SCAVENGER",
+        desc: `Guessed ${maxScavenger} low-value slots (#1-#3)`,
+        playerId: scavengerWinner.id,
+        playerName: scavengerWinner.name,
+        metric: `${maxScavenger} foundation hits (#1-#3)`,
+        svg: scavengerSvg
+      });
+    }
+
+    // 4. MOST ACCURATE: player with highest correct-guess-to-miss ratio
+    let bestRatio = -1;
+    let accurateWinner = null;
+    let accurateHits = 0;
+    let accurateAttempts = 0;
+
+    players.forEach(p => {
+      const correct = this.getPlayerCorrectGuesses(p, lists);
+      const misses = (p.missedGuesses && Array.isArray(p.missedGuesses)) ? p.missedGuesses.length : 0;
+      const total = correct + misses;
+      if (correct > 0 && total > 0) {
+        const ratio = correct / total;
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+          accurateWinner = p;
+          accurateHits = correct;
+          accurateAttempts = total;
+        }
+      }
+    });
+
+    if (accurateWinner && bestRatio > 0) {
+      const pct = Math.round(bestRatio * 100);
+      awards.push({
+        id: "accurate",
+        title: "MOST ACCURATE",
+        desc: `${pct}% accuracy ratio`,
+        playerId: accurateWinner.id,
+        playerName: accurateWinner.name,
+        metric: `${pct}% accuracy (${accurateHits}/${accurateAttempts} guesses)`,
+        svg: accurateSvg
+      });
+    }
+
+    return awards;
+  }
+
+  renderPodiumAwards(awards) {
+    if (!this.podiumAwardsContainer) return;
+    this.podiumAwardsContainer.innerHTML = "";
+
+    if (!awards || awards.length === 0) {
+      this.podiumAwardsCard?.classList.add("hidden");
+      return;
+    }
+
+    this.podiumAwardsCard?.classList.remove("hidden");
+
+    awards.forEach(award => {
+      const card = document.createElement("div");
+      card.className = "award-badge-card";
+      card.innerHTML = `
+        <div class="award-badge-header">
+          ${award.svg}
+          <span>${this.escapeHtml(award.title)}</span>
+        </div>
+        <div class="award-recipient-name">${this.escapeHtml(award.playerName)}</div>
+        <div class="award-metric-desc">${this.escapeHtml(award.metric)}</div>
+      `;
+      this.podiumAwardsContainer.appendChild(card);
+    });
+  }
+
+  // ==========================================================================
+  // SOUND CONTROL & MUTE TOGGLE
+  // ==========================================================================
+
+  toggleSound() {
+    if (!this.soundEngine) return;
+    const isMuted = this.soundEngine.toggleMute();
+    this.updateSoundToggleUi();
+    this.showAlert(isMuted ? "Sound muted." : "Sound enabled.");
+  }
+
+  updateSoundToggleUi() {
+    if (!this.btnSoundToggle) return;
+    const isMuted = this.soundEngine ? this.soundEngine.isMuted : false;
+    this.btnSoundToggle.classList.toggle("muted", isMuted);
+    const onIcon = this.btnSoundToggle.querySelector(".icon-sound-on");
+    const offIcon = this.btnSoundToggle.querySelector(".icon-sound-off");
+    if (onIcon) onIcon.classList.toggle("hidden", isMuted);
+    if (offIcon) offIcon.classList.toggle("hidden", !isMuted);
+    this.btnSoundToggle.title = isMuted ? "Sound: MUTED (Click to unmute)" : "Sound: ON (Click to mute)";
+  }
+
+  // ==========================================================================
+  // TURN TIMER CONTROLS & RUNTIME TICKER
+  // ==========================================================================
+
+  async setRoomTurnTimer(seconds) {
+    if (!this.isHost || !this.currentRoomCode) return;
+    try {
+      await database.ref(`rooms/${this.currentRoomCode}/meta/turnTimer`).set(seconds);
+      this.lobbyTimerOptions.forEach(btn => {
+        const s = parseInt(btn.dataset.seconds, 10) || 0;
+        btn.classList.toggle("selected", s === seconds);
+      });
+      if (this.turnTimerBadgeNote) {
+        this.turnTimerBadgeNote.textContent = seconds > 0 ? `${seconds}s Turn Timer Enabled` : "Turn Timer Disabled";
+      }
+    } catch (e) {
+      console.error("Failed to update room turn timer:", e);
+    }
+  }
+
+  setLocalTurnTimer(seconds) {
+    this.localTurnTimer = seconds;
+    if (this.localMatch && this.localMatch.meta) {
+      this.localMatch.meta.turnTimer = seconds;
+      this.saveLocalMatch(this.localMatch);
+    }
+    this.localTimerOptions.forEach(btn => {
+      const s = parseInt(btn.dataset.seconds, 10) || 0;
+      btn.classList.toggle("selected", s === seconds);
+    });
+  }
+
+  renderTurnTimer(room) {
+    const timerSec = (room && room.meta) ? (Number(room.meta.turnTimer) || 0) : 0;
+    const isGameActive = (room && room.meta && room.meta.status === "playing");
+
+    if (timerSec <= 0 || !isGameActive) {
+      this.turnTimerBadge?.classList.add("hidden");
+      this.turnTimerBarWrapper?.classList.add("hidden");
+      this.passiveTimerBadge?.classList.add("hidden");
+      this.passiveTimerBarWrapper?.classList.add("hidden");
+      this.lastTickSecond = null;
+      return;
+    }
+
+    this.turnTimerBadge?.classList.remove("hidden");
+    this.turnTimerBarWrapper?.classList.remove("hidden");
+    this.passiveTimerBadge?.classList.remove("hidden");
+    this.passiveTimerBarWrapper?.classList.remove("hidden");
+
+    // Check if game is paused or waiting on a verification popup
+    const isModalOpen = (
+      this.modalConfirmation?.classList.contains("open") ||
+      this.waitingConfirmationBackdrop?.classList.contains("open") ||
+      this.modalLocalVerifyChoice?.classList.contains("open") ||
+      this.modalLocalSecretTargetSlots?.classList.contains("open") ||
+      this.modalPrivacyCurtain?.classList.contains("open") ||
+      this.modalPauseOverlay?.classList.contains("open")
+    );
+    if (room.meta?.isPaused || isModalOpen) {
+      return;
+    }
+
+    const turnStartedAt = room.game?.turnStartedAt || Date.now();
+    const elapsedMs = Math.max(0, Date.now() - turnStartedAt);
+    const elapsedSec = elapsedMs / 1000;
+    const remainingSec = Math.max(0, Math.ceil(timerSec - elapsedSec));
+
+    const mins = Math.floor(remainingSec / 60);
+    const secs = remainingSec % 60;
+    const formatted = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+    if (this.turnTimerCountdown) this.turnTimerCountdown.textContent = formatted;
+    if (this.passiveTimerCountdown) this.passiveTimerCountdown.textContent = formatted;
+
+    const pct = Math.max(0, Math.min(100, (remainingSec / timerSec) * 100));
+    if (this.turnTimerProgressBar) this.turnTimerProgressBar.style.width = `${pct}%`;
+    if (this.passiveTimerProgressBar) this.passiveTimerProgressBar.style.width = `${pct}%`;
+
+    const isDanger = (remainingSec <= 5);
+    const isWarning = (remainingSec <= 10 && remainingSec > 5);
+
+    [this.turnTimerBadge, this.passiveTimerBadge, this.turnTimerProgressBar, this.passiveTimerProgressBar].forEach(el => {
+      if (!el) return;
+      el.classList.toggle("timer-danger", isDanger);
+      el.classList.toggle("timer-warning", isWarning);
+    });
+
+    // Soft woodblock tick once per second in the last 5 seconds
+    if (isDanger && remainingSec > 0) {
+      if (this.lastTickSecond !== remainingSec) {
+        this.lastTickSecond = remainingSec;
+        this.soundEngine.playTimerTick();
+      }
+    } else {
+      this.lastTickSecond = null;
+    }
+
+    // Auto-advance turn if timer reaches 0
+    if (remainingSec === 0 && !this.isHandlingTimeout) {
+      this.isHandlingTimeout = true;
+      const activePid = room.game?.activePlayerId;
+      const activePlayer = room.players ? room.players[activePid] : null;
+      const activeName = activePlayer ? activePlayer.name : "Player";
+
+      if (this.isLocalMode) {
+        this.showAlert(`Time's up! ${activeName}'s turn was skipped.`, "skip");
+        this.advanceLocalTurn();
+        setTimeout(() => { this.isHandlingTimeout = false; }, 1500);
+      } else {
+        const isMyTurn = (this.myPlayerId === activePid);
+        if (isMyTurn) {
+          this.showAlert(`Time's up! ${activeName}'s turn was skipped.`, "skip");
+          this.advanceTurn();
+          setTimeout(() => { this.isHandlingTimeout = false; }, 1500);
+        } else if (this.isHost && elapsedSec > (timerSec + 2.5)) {
+          this.showAlert(`Time's up! ${activeName}'s turn was skipped.`, "skip");
+          this.advanceTurn();
+          setTimeout(() => { this.isHandlingTimeout = false; }, 1500);
+        } else {
+          setTimeout(() => { this.isHandlingTimeout = false; }, 1200);
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // LAST PLAYER STANDING CONTROLS (NEVER FORCED AUTOMATICALLY)
+  // ==========================================================================
+
+  getPlayersWithHiddenSlots(room = (this.isLocalMode ? this.localMatch : this.roomData)) {
+    if (!room || !room.players || !room.lists) return [];
+    const activePlayers = Object.values(room.players).filter(p => {
+      if (!this.isLocalMode && p.connected === false) return false;
+      return true;
+    });
+    return activePlayers.filter(p => !this.isPlayerListCompleted(p.id, room.lists));
+  }
+
+  async toggleAutoSkipLastPlayer() {
+    if (this.isLocalMode) {
+      if (!this.localMatch) return;
+      if (!this.localMatch.meta) this.localMatch.meta = {};
+      const current = (this.localMatch.meta.autoSkipLastPlayer === true);
+      this.localMatch.meta.autoSkipLastPlayer = !current;
+      this.saveLocalMatch(this.localMatch);
+      this.renderMainGame(this.localMatch);
+      this.showAlert(`Auto-skip last player's turns: ${!current ? 'ON' : 'OFF'}`);
+      return;
+    }
+
+    if (!this.isHost || !this.currentRoomCode || !this.roomData) return;
+    const current = (this.roomData.meta?.autoSkipLastPlayer === true);
+    const nextVal = !current;
+    try {
+      await database.ref(`rooms/${this.currentRoomCode}/meta/autoSkipLastPlayer`).set(nextVal);
+      this.showAlert(`Auto-skip last player's turns: ${nextVal ? 'ON' : 'OFF'}`);
+    } catch (e) {
+      console.error("Failed to toggle auto-skip last player:", e);
+    }
+  }
+
+  async hostEndMatchNow() {
+    this.showConfirmModal({
+      title: "END MATCH NOW",
+      message: "End the match immediately and proceed to the winner podium?",
+      confirmText: "END MATCH",
+      confirmClass: "btn-danger",
+      onConfirm: async () => {
+        if (this.isLocalMode) {
+          if (!this.localMatch) return;
+          this.localMatch.meta.status = "gameover";
+          this.saveLocalMatch(this.localMatch);
+          this.renderGameOver(this.localMatch);
+          this.showAlert("Match ended by Host. Proceeding to Podium.");
+          return;
+        }
+
+        if (!this.isHost || !this.currentRoomCode) return;
+        try {
+          await database.ref(`rooms/${this.currentRoomCode}/meta/status`).set("gameover");
+          this.showAlert("Match ended by Host. Proceeding to Podium.");
+        } catch (e) {
+          console.error("Failed to end match:", e);
+        }
+      }
+    });
+  }
+
+  // ==========================================================================
+  // EMOJI-FREE TYPOGRAPHIC TACTICAL STAMPS (ZERO EMOJIS)
+  // ==========================================================================
+
+  async sendCallout(calloutText) {
+    if (!calloutText) return;
+    const now = Date.now();
+    const cooldownMs = 6000;
+    if (this.lastCalloutTime && (now - this.lastCalloutTime) < cooldownMs) {
+      const remainingSec = Math.ceil((cooldownMs - (now - this.lastCalloutTime)) / 1000);
+      this.showAlert(`Callout cooling down (${remainingSec}s remaining).`);
+      return;
+    }
+
+    this.lastCalloutTime = now;
+    this.updateCalloutCooldownUi();
+
+    let senderName = "Player";
+    if (this.isLocalMode) {
+      const activePid = this.localMatch?.game?.activePlayerId;
+      senderName = this.localMatch?.players?.[activePid]?.name || "Player";
+    } else {
+      senderName = this.myPlayerName || "Player";
+    }
+
+    const payload = {
+      senderId: this.myPlayerId || "local",
+      senderName: senderName,
+      callout: calloutText.toUpperCase(),
+      timestamp: now
+    };
+
+    if (this.isLocalMode) {
+      if (this.localMatch) {
+        this.localMatch.lastCallout = payload;
+        this.saveLocalMatch(this.localMatch);
+      }
+      this.displayCalloutStamp(senderName, payload.callout);
+      return;
+    }
+
+    if (!this.currentRoomCode) return;
+    try {
+      await database.ref(`rooms/${this.currentRoomCode}/lastCallout`).set(payload);
+    } catch (e) {
+      console.error("Failed to broadcast callout:", e);
+    }
+  }
+
+  updateCalloutCooldownUi() {
+    if (!this.calloutCooldownBadge || !this.btnCallouts) return;
+    const now = Date.now();
+    const cooldownMs = 6000;
+    const elapsed = now - this.lastCalloutTime;
+    if (this.lastCalloutTime && elapsed < cooldownMs) {
+      const remainingSec = Math.ceil((cooldownMs - elapsed) / 1000);
+      this.calloutCooldownBadge.style.display = "inline-block";
+      this.calloutCooldownBadge.textContent = `${remainingSec}S`;
+      this.btnCallouts.forEach(btn => {
+        btn.disabled = true;
+      });
+    } else {
+      this.calloutCooldownBadge.style.display = "none";
+      this.btnCallouts.forEach(btn => {
+        btn.disabled = false;
+      });
+    }
+  }
+
+  displayCalloutStamp(senderName, phrase) {
+    if (!this.calloutStampContainer) return;
+    const cleanSender = this.escapeHtml(senderName || "PLAYER").toUpperCase();
+    const cleanPhrase = this.escapeHtml(phrase || "").toUpperCase();
+
+    const stamp = document.createElement("div");
+    stamp.className = "callout-stamp-badge";
+    stamp.innerHTML = `
+      <span class="callout-sender">${cleanSender}</span>
+      <span class="callout-sep">//</span>
+      <span class="callout-phrase">"${cleanPhrase}"</span>
+    `;
+
+    this.calloutStampContainer.innerHTML = "";
+    this.calloutStampContainer.appendChild(stamp);
+    this.calloutStampContainer.classList.remove("hidden");
+
+    if (this.calloutStampTimeout) clearTimeout(this.calloutStampTimeout);
+    this.calloutStampTimeout = setTimeout(() => {
+      this.calloutStampContainer.classList.add("hidden");
+      this.calloutStampContainer.innerHTML = "";
+    }, 2500);
   }
 
   // ==========================================================================
@@ -4737,6 +5625,8 @@ class GameController {
         mode: "local",
         category: this.localCategory,
         customCategory: this.localCategory === "custom" ? customTitle : "",
+        turnTimer: this.localTurnTimer || 0,
+        autoSkipLastPlayer: false,
         status: "entry",
         createdAt: Date.now()
       },
@@ -4892,6 +5782,7 @@ class GameController {
     }
 
     this.localMatch.meta.status = "playing";
+    this.localMatch.game.turnStartedAt = Date.now();
     this.localMatch.game.turnOrder = pids;
     this.localMatch.game.currentTurnIndex = 0;
     this.localMatch.game.activePlayerId = pids[0];
@@ -4927,6 +5818,8 @@ class GameController {
     }
 
     this.switchView("game");
+    this.localMatch.game.turnStartedAt = Date.now();
+    this.soundEngine.playTurnStart();
     this.renderMainGame(this.localMatch);
     this.updateMyListButtonVisibility(this.localMatch);
   }
@@ -4935,6 +5828,12 @@ class GameController {
     const pointsAwarded = slot.points;
     const newGuesserPoints = (guesserPlayer.points || 0) + pointsAwarded;
     const newGuesserGuesses = (guesserPlayer.correctGuesses || 0) + 1;
+
+    if (pointsAwarded >= 8) {
+      this.soundEngine.playSniperCorrect();
+    } else {
+      this.soundEngine.playStandardCorrect();
+    }
 
     slot.revealed = true;
     slot.guessedBy = guesserPlayer.name;
@@ -5028,8 +5927,9 @@ class GameController {
       nextRound += 1;
     }
 
+    const autoSkipEnabled = (this.localMatch.meta?.autoSkipLastPlayer === true);
     let attempts = 0;
-    while (attempts < turnOrder.length && this.hasNoValidTargets(turnOrder[nextIndex], this.localMatch)) {
+    while (attempts < turnOrder.length && autoSkipEnabled && this.hasNoValidTargets(turnOrder[nextIndex], this.localMatch)) {
       nextIndex = (nextIndex + 1) % turnOrder.length;
       if (nextIndex === 0) nextRound += 1;
       attempts++;
@@ -5038,6 +5938,7 @@ class GameController {
     const nextActivePlayerId = turnOrder[nextIndex];
     game.currentTurnIndex = nextIndex;
     game.activePlayerId = nextActivePlayerId;
+    game.turnStartedAt = Date.now();
     game.round = nextRound;
     game.confirmation = null;
 
@@ -5130,6 +6031,7 @@ class GameController {
 
   handleLocalVerifyWrong() {
     if (!this.localPendingVerify) return;
+    this.soundEngine.playMiss();
     const { guessText, targetPlayerId, guesserPlayerId } = this.localPendingVerify;
     const targetPlayer = this.localMatch.players[targetPlayerId];
     const guesserPlayer = this.localMatch.players[guesserPlayerId];

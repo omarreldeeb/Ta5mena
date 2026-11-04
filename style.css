@@ -651,10 +651,56 @@ header.app-header {
 
 .slot-row {
   display: grid;
-  grid-template-columns: 78px 1fr;
+  grid-template-columns: 74px 1fr 64px;
   gap: 8px;
   align-items: center;
   position: relative;
+}
+
+.slot-reorder-group {
+  display: flex;
+  gap: 4px;
+  height: 44px;
+}
+
+.btn-slot-reorder {
+  flex: 1;
+  height: 44px;
+  min-width: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-slot-reorder:hover:not(:disabled) {
+  border-color: var(--accent);
+  background-color: #222222;
+  color: var(--accent);
+}
+
+.btn-slot-reorder:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  border-color: var(--border-subtle);
+}
+
+.btn-slot-reorder .icon-reorder {
+  width: 14px;
+  height: 14px;
+}
+
+.slot-swap-flash {
+  border-color: var(--accent) !important;
+  background-color: rgba(255, 107, 0, 0.18) !important;
+  box-shadow: 0 0 10px rgba(255, 107, 0, 0.35) !important;
+  transition: all 0.15s ease !important;
 }
 
 .slot-rank-label {
@@ -2583,6 +2629,348 @@ header.app-header {
     font-size: 11px;
     padding: 3px 10px;
   }
+  .slot-row {
+    grid-template-columns: 56px 1fr 56px;
+    gap: 6px;
+  }
+  .btn-slot-reorder {
+    min-width: 26px;
+  }
+  .turn-timer-options-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .callout-buttons-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .podium-awards-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* ============================================================================
+   SOUND ENGINE & MUTE TOGGLE
+   ============================================================================ */
+.btn-sound-toggle {
+  height: 30px;
+  width: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-sound-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-sound-toggle.muted {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ============================================================================
+   TURN TIMER PICKER & ACTIVE PROGRESS BAR
+   ============================================================================ */
+.turn-timer-picker-container {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.turn-timer-options-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.btn-timer-option {
+  height: 34px;
+  padding: 0 4px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-timer-option:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.btn-timer-option.selected {
+  border-color: var(--accent);
+  background-color: var(--bg-card);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(255, 107, 0, 0.25);
+}
+
+.btn-timer-option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.turn-timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.05em;
+}
+
+.turn-timer-bar-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+.turn-timer-progress-bar {
+  height: 100%;
+  width: 100%;
+  background-color: var(--accent);
+  transition: width 0.1s linear, background-color 0.25s ease;
+}
+
+.turn-timer-progress-bar.timer-warning {
+  background-color: #FF8800;
+}
+
+.turn-timer-progress-bar.timer-danger {
+  background-color: var(--danger);
+  box-shadow: 0 0 8px rgba(235, 59, 90, 0.7);
+}
+
+/* ============================================================================
+   HOST LAST PLAYER STANDING CONTROLS & PASS BANNER
+   ============================================================================ */
+.host-last-standing-box {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(180deg, var(--bg-card) 0%, rgba(255, 107, 0, 0.06) 100%);
+  margin-bottom: 12px;
+}
+
+.host-last-standing-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.last-player-pass-banner {
+  padding: 14px;
+  background-color: var(--bg-input);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.last-player-pass-notice {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+/* ============================================================================
+   TACTICAL CALLOUT BAR & KINETIC STAMPS
+   ============================================================================ */
+.callout-bar-card {
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+
+.callout-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn-callout {
+  height: 36px;
+  padding: 0 4px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.btn-callout:hover:not(:disabled) {
+  border-color: var(--accent);
+  background-color: #222222;
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-callout:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.callout-stamp-container {
+  position: fixed;
+  bottom: 24px;
+  right: 18px;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: calc(100vw - 36px);
+}
+
+.callout-stamp-badge {
+  background: #0E0E0E;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 14px rgba(255, 107, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  animation: stampEntrance 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes stampEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.callout-stamp-badge .callout-sender {
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.callout-stamp-badge .callout-sep {
+  font-size: 11px;
+  color: var(--border-strong);
+  font-weight: 700;
+}
+
+.callout-stamp-badge .callout-phrase {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================================
+   PODIUM AWARD TITLES & HONORS
+   ============================================================================ */
+.podium-awards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.award-badge-card {
+  padding: 10px 12px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.award-badge-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.award-badge-header svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.award-recipient-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.award-metric-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.player-award-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.player-award-pill svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
 }
 
 /* ============================================================================
