@@ -9,7 +9,7 @@ import {
   normalizeText, 
   getLevenshteinDistance, 
   searchSuggestions 
-} from "./suggestions.js";
+} from "./suggestions.js?v=20261104";
 
 // ============================================================================
 // FIREBASE CONFIGURATION
@@ -265,12 +265,13 @@ class DatabaseService {
           }
         });
       }
+    }
   }
 }
 
 // Global Database Service instance & compatibility shim
-export const db = new DatabaseService();
-export const database = {
+const db = new DatabaseService();
+const database = {
   ref: (path) => ({
     set: (val) => db.set(path, val),
     update: (val) => db.update(path, val),
@@ -1121,7 +1122,7 @@ class GameController {
 
   switchView(viewName) {
     this.currentView = viewName;
-    Object.values(this.views).forEach(el => el.classList.remove("active"));
+    Object.values(this.views).forEach(el => el?.classList?.remove("active"));
     if (this.views[viewName]) {
       this.views[viewName].classList.add("active");
     }

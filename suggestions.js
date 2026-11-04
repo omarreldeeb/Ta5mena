@@ -1775,3 +1775,10 @@ export function searchSuggestions(category, query, maxResults = 8) {
 
   return unique;
 }
+
+if (typeof window !== "undefined") {
+  window.SUGGESTIONS = SUGGESTIONS;
+  window.normalizeText = normalizeText;
+  window.getLevenshteinDistance = getLevenshteinDistance;
+  window.searchSuggestions = searchSuggestions;
+}
