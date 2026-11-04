@@ -265,8 +265,21 @@ class DatabaseService {
           }
         });
       }
-    }
   }
+}
+
+// Global Database Service instance & compatibility shim
+export const db = new DatabaseService();
+export const database = {
+  ref: (path) => ({
+    set: (val) => db.set(path, val),
+    update: (val) => db.update(path, val),
+    remove: () => db.remove(path)
+  })
+};
+if (typeof window !== "undefined") {
+  window.db = db;
+  window.database = database;
 }
 
 // ============================================================================
@@ -572,8 +585,8 @@ class GameController {
     // Home
     this.inputPlayerName = document.getElementById("input-player-name");
     this.inputRoomCode = document.getElementById("input-room-code");
-    this.btnCreateRoom = document.getElementById("btn-create-room");
-    this.btnJoinRoom = document.getElementById("btn-join-room");
+    this.btnCreateRoom = document.getElementById("btn-create-room") || document.getElementById("create-room-btn");
+    this.btnJoinRoom = document.getElementById("btn-join-room") || document.getElementById("join-room-btn");
     this.reconnectBox = document.getElementById("reconnect-box");
     this.reconnectRoomLabel = document.getElementById("reconnect-room-label");
     this.reconnectNameLabel = document.getElementById("reconnect-name-label");
@@ -904,8 +917,25 @@ class GameController {
     });
 
     // Home
-    this.btnCreateRoom?.addEventListener("click", () => this.handleCreateRoom());
-    this.btnJoinRoom?.addEventListener("click", () => this.handleJoinRoom());
+    const btnCreate = this.btnCreateRoom || document.getElementById("btn-create-room") || document.getElementById("create-room-btn");
+    btnCreate?.addEventListener("click", () => this.handleCreateRoom());
+
+    const btnJoin = this.btnJoinRoom || document.getElementById("btn-join-room") || document.getElementById("join-room-btn");
+    btnJoin?.addEventListener("click", () => this.handleJoinRoom());
+
+    // Delegated click fallback for Create Room and Join Room
+    document.addEventListener("click", (e) => {
+      const createTrigger = e.target.closest("#btn-create-room, #create-room-btn");
+      if (createTrigger) {
+        e.preventDefault();
+        this.handleCreateRoom();
+      }
+      const joinTrigger = e.target.closest("#btn-join-room, #join-room-btn");
+      if (joinTrigger) {
+        e.preventDefault();
+        this.handleJoinRoom();
+      }
+    });
     this.inputRoomCode?.addEventListener("input", (e) => {
       e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
     });
@@ -1040,21 +1070,29 @@ class GameController {
     document.addEventListener("keydown", () => this.soundEngine.ensureContext(), { once: true });
 
     // Lobby Turn Timer Selector
-    this.lobbyTimerOptions.forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (!this.isHost) return;
-        const seconds = parseInt(btn.dataset.seconds, 10) || 0;
-        this.setRoomTurnTimer(seconds);
+    if (this.lobbyTimerOptions) {
+      this.lobbyTimerOptions.forEach(btn => {
+        if (btn) {
+          btn.addEventListener("click", () => {
+            if (!this.isHost) return;
+            const seconds = parseInt(btn.dataset.seconds, 10) || 0;
+            this.setRoomTurnTimer(seconds);
+          });
+        }
       });
-    });
+    }
 
     // Local Turn Timer Selector
-    this.localTimerOptions.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const seconds = parseInt(btn.dataset.seconds, 10) || 0;
-        this.setLocalTurnTimer(seconds);
+    if (this.localTimerOptions) {
+      this.localTimerOptions.forEach(btn => {
+        if (btn) {
+          btn.addEventListener("click", () => {
+            const seconds = parseInt(btn.dataset.seconds, 10) || 0;
+            this.setLocalTurnTimer(seconds);
+          });
+        }
       });
-    });
+    }
 
     // Last Player Standing Controls & Pass Turn
     this.btnPassMyTurn?.addEventListener("click", () => {
@@ -1068,9 +1106,13 @@ class GameController {
     this.btnHostEndMatchNow?.addEventListener("click", () => this.hostEndMatchNow());
 
     // Tactical Callouts
-    this.btnCallouts.forEach(btn => {
-      btn.addEventListener("click", () => this.sendCallout(btn.dataset.callout));
-    });
+    if (this.btnCallouts) {
+      this.btnCallouts.forEach(btn => {
+        if (btn) {
+          btn.addEventListener("click", () => this.sendCallout(btn.dataset.callout));
+        }
+      });
+    }
   }
 
   // ==========================================================================
@@ -1614,16 +1656,29 @@ class GameController {
     return "p_" + Math.random().toString(36).substring(2, 10);
   }
 
+  createRoom() {
+    return this.handleCreateRoom();
+  }
+
   async handleCreateRoom() {
-    const name = this.inputPlayerName.value.trim();
+    const nameInput = this.inputPlayerName || document.getElementById("input-player-name");
+    const name = nameInput ? nameInput.value.trim() : (this.myPlayerName || "").trim();
     if (!name) {
       this.showAlert("Please enter your name first.");
-      this.inputPlayerName.focus();
+      if (nameInput) nameInput.focus();
       return;
     }
 
+    this.myPlayerName = name;
+    try {
+      localStorage.setItem("ta5mena_player_name", name);
+    } catch (e) {}
+
     const roomCode = this.generateRoomCode();
     const playerId = this.generatePlayerId();
+    this.myPlayerId = playerId;
+    this.isHost = true;
+    this.currentRoomCode = roomCode;
 
     const initialRoom = {
       lastActivity: Date.now(),
@@ -1654,22 +1709,28 @@ class GameController {
       game: {
         turnOrder: [],
         currentTurnIndex: 0,
-        activePlayerId: null,
+        activePlayerId: "",
         round: 1,
         lastAction: {
           text: `Room created by ${name}. Waiting for players.`,
+          type: "general",
           timestamp: Date.now()
         },
-        confirmation: null
+        confirmation: ""
       }
     };
 
-    await db.set(`rooms/${roomCode}`, initialRoom);
-    await db.registerSoloLobbyDisconnect(roomCode);
-    await db.trackPlayerConnection(roomCode, playerId);
-    this.saveSession(playerId, name, roomCode);
-    this.updateRoomUrl(roomCode);
-    this.subscribeToRoom(roomCode);
+    try {
+      await db.set(`rooms/${roomCode}`, initialRoom);
+      await db.registerSoloLobbyDisconnect(roomCode);
+      await db.trackPlayerConnection(roomCode, playerId);
+      this.saveSession(playerId, name, roomCode);
+      this.updateRoomUrl(roomCode);
+      this.subscribeToRoom(roomCode);
+    } catch (err) {
+      console.error("Failed to create room in Firebase:", err);
+      this.showAlert("Failed to create room. Please try again.");
+    }
   }
 
   async handleJoinRoom() {
@@ -3037,9 +3098,9 @@ class GameController {
     } else if (status === "playing") {
       this.renderMainGame(room);
       this.switchView("game");
-    } else if (status === "game_over") {
+    } else if (status === "game_over" || status === "gameover") {
       this.renderGameOver(room);
-      this.switchView("game_over");
+      this.switchView("gameOver");
     }
   }
 
@@ -5070,8 +5131,9 @@ class GameController {
   async setRoomTurnTimer(seconds) {
     if (!this.isHost || !this.currentRoomCode) return;
     try {
-      await database.ref(`rooms/${this.currentRoomCode}/meta/turnTimer`).set(seconds);
-      this.lobbyTimerOptions.forEach(btn => {
+      await db.set(`rooms/${this.currentRoomCode}/meta/turnTimer`, seconds);
+      this.lobbyTimerOptions?.forEach(btn => {
+        if (!btn) return;
         const s = parseInt(btn.dataset.seconds, 10) || 0;
         btn.classList.toggle("selected", s === seconds);
       });
@@ -5218,7 +5280,7 @@ class GameController {
     const current = (this.roomData.meta?.autoSkipLastPlayer === true);
     const nextVal = !current;
     try {
-      await database.ref(`rooms/${this.currentRoomCode}/meta/autoSkipLastPlayer`).set(nextVal);
+      await db.set(`rooms/${this.currentRoomCode}/meta/autoSkipLastPlayer`, nextVal);
       this.showAlert(`Auto-skip last player's turns: ${nextVal ? 'ON' : 'OFF'}`);
     } catch (e) {
       console.error("Failed to toggle auto-skip last player:", e);
@@ -5243,7 +5305,7 @@ class GameController {
 
         if (!this.isHost || !this.currentRoomCode) return;
         try {
-          await database.ref(`rooms/${this.currentRoomCode}/meta/status`).set("gameover");
+          await db.set(`rooms/${this.currentRoomCode}/meta/status`, "game_over");
           this.showAlert("Match ended by Host. Proceeding to Podium.");
         } catch (e) {
           console.error("Failed to end match:", e);
@@ -5295,7 +5357,7 @@ class GameController {
 
     if (!this.currentRoomCode) return;
     try {
-      await database.ref(`rooms/${this.currentRoomCode}/lastCallout`).set(payload);
+      await db.set(`rooms/${this.currentRoomCode}/lastCallout`, payload);
     } catch (e) {
       console.error("Failed to broadcast callout:", e);
     }
@@ -6233,11 +6295,19 @@ class GameController {
   }
 }
 
-// Instantiate game on page load
-window.addEventListener("DOMContentLoaded", () => {
+// Instantiate game with resilient DOM readiness check
+function bootGame() {
   document.querySelectorAll(".modal-backdrop").forEach(el => {
     el.classList.remove("open");
     el.classList.add("hidden");
   });
-  window.gameApp = new GameController();
-});
+  if (!window.gameApp) {
+    window.gameApp = new GameController();
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootGame);
+} else {
+  bootGame();
+}
