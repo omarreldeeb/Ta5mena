@@ -945,129 +945,279 @@ header.app-header {
   color: var(--text-muted);
 }
 
-/* Turn Order Bar */
+/* ============================================================================
+   UNIFIED PLAYER & TURN ORDER BAR
+   ============================================================================ */
+
+.unified-player-card,
+.turn-order-card,
+#unified-player-bar-card {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+}
+
+.unified-bar-subtitle {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+}
+
+.unified-player-bar,
 .turn-order-bar,
-#turn-order-container,
-#turn-order-list {
+#turn-order-container {
   display: flex !important;
   flex-wrap: wrap !important;
   align-items: center;
   gap: 6px !important;
   overflow: visible !important;
   overflow-x: visible !important;
-  padding: 4px 0 !important;
+  padding: 2px 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
+.unified-player-pill,
 .turn-pill,
 .turn-order-pill {
   display: inline-flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
   gap: 6px !important;
-  padding: 5px 10px !important;
-  font-size: 12px !important;
+  padding: 6px 10px !important;
+  min-height: 34px !important;
   height: auto !important;
-  min-height: 0 !important;
-  flex: 0 1 auto !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary);
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  white-space: nowrap;
-  color: var(--text-secondary);
+  cursor: pointer;
+  flex: 0 1 auto !important;
   box-sizing: border-box !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
   line-height: 1.2 !important;
 }
 
+.unified-player-pill:hover:not(.disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* Player whose turn it currently is */
+.unified-player-pill.is-turn,
 .turn-pill.is-active,
 .turn-order-pill.is-active {
-  background-color: var(--accent);
-  color: var(--accent-text);
-  border-color: var(--accent);
-  font-weight: 700;
+  background-color: rgba(255, 77, 0, 0.12) !important;
+  border-color: var(--accent) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
 }
 
+/* Active target player (selected opponent to guess against) */
+.unified-player-pill.is-targeted,
+.unified-player-pill.selected,
+.unified-player-pill.active {
+  border: 2px solid #FF4D00 !important;
+  background-color: rgba(255, 77, 0, 0.20) !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 8px rgba(255, 77, 0, 0.25);
+}
+
+/* Viewing board indicator */
+.unified-player-pill.is-viewing:not(.is-targeted):not(.is-turn) {
+  border-color: var(--accent) !important;
+  color: var(--text-primary) !important;
+  background-color: var(--bg-input) !important;
+}
+
+/* Completed list */
+.unified-player-pill.is-completed,
 .turn-pill.is-completed,
 .turn-order-pill.is-completed {
-  opacity: 0.6;
+  opacity: 0.55 !important;
 }
 
-/* Active Turn Control Box */
-.control-box {
+.unified-player-name {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 140px;
+}
+
+.unified-you-tag {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.unified-badge-turn {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 2px 5px !important;
+  border-radius: 3px !important;
+  flex-shrink: 0 !important;
+}
+
+.unified-badge-target {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #FF4D00 !important;
+  border: 1px solid #FF4D00 !important;
+  padding: 2px 5px !important;
+  border-radius: 3px !important;
+  flex-shrink: 0 !important;
+  background: rgba(255, 77, 0, 0.15);
+}
+
+.unified-badge-done,
+.unified-badge-viewing {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 5px !important;
+  border-radius: 3px !important;
+  flex-shrink: 0 !important;
+}
+
+/* ============================================================================
+   ULTRA-COMPACT ACTIVE TURN CONTROL BOX (NO INNER SCROLLING)
+   ============================================================================ */
+
+.control-box,
+#active-turn-control,
+.turn-panel,
+#active-turn-box {
   background-color: var(--bg-card);
-  border: 2px solid var(--accent);
+  border: 2px solid var(--accent) !important;
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 10px 12px !important;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  box-sizing: border-box !important;
 }
 
-.control-box-header {
+.turn-status-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  width: 100%;
 }
 
-.control-box-title {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent);
+.turn-status-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.turn-tag-badge {
   font-family: var(--font-mono);
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
-.target-selector-grid,
-#target-player-grid,
-#target-player-list,
-.target-selector,
-.target-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)) !important;
-  gap: 6px !important;
-  width: 100% !important;
-  overflow: visible !important;
-  overflow-x: visible !important;
+.turn-status-sep {
+  color: var(--text-muted);
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
-.target-btn,
-.target-player-btn {
-  padding: 8px 10px !important;
-  min-height: 38px !important;
-  height: auto !important;
-  font-size: 13px !important;
+.turn-targeting-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.turn-target-name {
+  color: #FFFFFF;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.turn-status-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.turn-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.guess-input-row.compact-guess-row {
   display: flex !important;
+  gap: 8px !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 6px !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.guess-input-row.compact-guess-row input {
+  flex: 1 1 auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  min-width: 0 !important;
   box-sizing: border-box !important;
+  padding: 0 12px !important;
+  font-size: 14px !important;
   background-color: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-  width: 100% !important;
-  text-align: left;
 }
 
-.target-player-name,
-.target-btn .target-player-name,
-.target-player-btn .target-player-name {
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
+.guess-input-row.compact-guess-row input:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
-.target-badge,
-.target-btn .target-badge,
-.target-player-btn .target-badge {
-  font-size: 10px !important;
-  font-weight: 700 !important;
+.btn-guess-submit {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+  letter-spacing: 0.05em !important;
   flex-shrink: 0 !important;
-  letter-spacing: 0.05em;
-  line-height: 1 !important;
+  font-size: 13px !important;
+  box-sizing: border-box !important;
+}
+
+/* Hide duplicate player selector and duplicate opponent tabs */
+#target-player-grid,
+.board-header-row {
+  display: none !important;
 }
 
 .target-btn:hover,
@@ -2729,11 +2879,36 @@ header.app-header {
   .app-container,
   main,
   .view-section,
-  .card,
-  .control-box {
+  .card {
     max-width: 100% !important;
     overflow-x: hidden !important;
     box-sizing: border-box !important;
+  }
+
+  /* Ensure Turn Box & Turn Order have zero inner vertical scrolling */
+  .control-box,
+  #active-turn-control,
+  .turn-panel,
+  #active-turn-box,
+  .turn-order-card,
+  #turn-order-container,
+  #unified-player-bar-card,
+  .unified-player-card {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+    padding: 10px 12px !important;
+  }
+
+  .unified-player-pill {
+    padding: 6px 9px !important;
+    min-height: 32px !important;
+    font-size: 12px !important;
+  }
+
+  .unified-player-name {
+    max-width: 110px;
   }
 
   #app-container {

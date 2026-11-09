@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ta5mena | Real-Time Top 10 Party Game</title>
   <meta name="description" content="Ta5mena - Real-time online multiplayer party game. Guess your friends' Top 10 lists ranked from 1 to 10.">
-  <link rel="stylesheet" href="style.css?v=20261109">
+  <link rel="stylesheet" href="style.css?v=20261109b">
 </head>
 <body>
   <div id="app-container">
@@ -475,16 +475,19 @@
         <span id="action-feed-time" class="action-feed-time">LIVE</span>
       </div>
 
-      <!-- Turn Sequence Bar -->
-      <div class="card" style="padding: 10px 12px;">
-        <div class="flex-between" style="margin-bottom: 6px;">
-          <span class="text-secondary" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono);">TURN ORDER</span>
+      <!-- UNIFIED PLAYER & TURN ORDER BAR -->
+      <div id="unified-player-bar-card" class="card unified-player-card" style="padding: 10px 12px;">
+        <div class="flex-between" style="margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span id="game-round-indicator" class="badge badge-accent">ROUND 1</span>
+            <span class="text-secondary unified-bar-subtitle">TAP A PLAYER TO TARGET / VIEW LIST</span>
+          </div>
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span id="game-round-indicator" class="badge">ROUND 1</span>
+            <button id="btn-top-host-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
           </div>
         </div>
-        <div id="turn-order-container" class="turn-order-bar">
-          <!-- Turn pills rendered dynamically -->
+        <div id="turn-order-container" class="turn-order-bar unified-player-bar">
+          <!-- Unified player pills rendered dynamically -->
         </div>
       </div>
 
@@ -508,19 +511,7 @@
       </div>
 
       <!-- ACTIVE PLAYER GUESSING CONTROL BOX (When it's your turn) -->
-      <div id="active-turn-control" class="control-box hidden">
-        <div class="control-box-header">
-          <span class="control-box-title" id="active-turn-control-title">YOUR TURN: GUESS AN OPPONENT'S ITEM</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div id="turn-timer-badge" class="turn-timer-badge hidden">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span id="turn-timer-countdown">00:00</span>
-            </div>
-            <button id="btn-active-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP TURN</button>
-            <span class="badge badge-accent">1 GUESS ONLY</span>
-          </div>
-        </div>
-
+      <div id="active-turn-control" class="control-box active-turn-compact hidden">
         <!-- Last Player Standing Pass Turn Banner -->
         <div id="last-player-pass-banner" class="last-player-pass-banner hidden">
           <div class="last-player-pass-notice">
@@ -532,27 +523,41 @@
         </div>
 
         <div id="turn-guessing-fields">
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">1. SELECT TARGET PLAYER</label>
-            <div id="target-player-grid" class="target-selector-grid">
-              <!-- Opponent buttons rendered here -->
+          <!-- Line 1: Compact Status Row -->
+          <div class="turn-status-line">
+            <div class="turn-status-left">
+              <span class="turn-tag-badge" id="turn-tag-badge">YOUR TURN</span>
+              <span class="turn-status-sep">:</span>
+              <span class="turn-targeting-label">TARGETING:</span>
+              <span id="active-target-name-display" class="turn-target-name">Select Target</span>
             </div>
-            <!-- Wrong guesses made against the selected target -->
-            <div id="target-missed-guesses-box" class="missed-guesses-box hidden mt-8">
-              <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
-              <div id="target-missed-guesses-list" class="missed-guesses-tags"></div>
+            <div class="turn-status-right">
+              <div id="turn-timer-badge" class="turn-timer-badge hidden">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span id="turn-timer-countdown">00:00</span>
+              </div>
+              <button id="btn-active-skip-turn" type="button" class="btn btn-sm btn-danger-outline hidden">SKIP</button>
             </div>
           </div>
 
-          <div style="position: relative;">
-            <label for="input-turn-guess" style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">2. TYPE GUESS (AUTOCOMPLETE OR FREE-TEXT)</label>
-            <div class="guess-input-row">
-              <input type="text" id="input-turn-guess" placeholder="Type a name..." autocomplete="off">
-              <button id="btn-submit-guess" class="btn btn-primary" disabled>Submit Guess</button>
+          <!-- Line 2: Input + Submit Row -->
+          <div class="turn-input-wrapper">
+            <div class="guess-input-row compact-guess-row">
+              <input type="text" id="input-turn-guess" placeholder="Guess on opponent's list..." autocomplete="off">
+              <button id="btn-submit-guess" class="btn btn-primary btn-guess-submit" disabled>GUESS</button>
             </div>
             <!-- Autocomplete dropdown for active guess -->
             <div id="turn-autocomplete-dropdown" class="autocomplete-dropdown"></div>
           </div>
+
+          <!-- Wrong guesses made against the selected target (kept compact below if any) -->
+          <div id="target-missed-guesses-box" class="missed-guesses-box hidden mt-6">
+            <div class="missed-guesses-title">PREVIOUS WRONG GUESSES ON THIS PLAYER:</div>
+            <div id="target-missed-guesses-list" class="missed-guesses-tags"></div>
+          </div>
+
+          <!-- Hidden target-player-grid container so existing references remain valid -->
+          <div id="target-player-grid" class="target-selector-grid hidden" style="display: none !important;"></div>
         </div>
 
         <!-- Progress bar along bottom edge of Active Turn box -->
@@ -583,14 +588,14 @@
 
       <!-- BOARD DISPLAY: OPPONENT & PRIVATE LISTS -->
       <div class="card">
-        <div class="board-header-row">
+        <div class="board-header-row" style="display: none !important;">
           <div id="player-tabs-bar" class="player-tabs-bar">
             <!-- Opponent tabs dynamically created -->
           </div>
         </div>
 
         <!-- Target Player Info Banner -->
-        <div id="selected-board-header" class="flex-between mt-8" style="padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
+        <div id="selected-board-header" class="flex-between" style="padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
           <div>
             <span id="selected-board-player-name" style="font-weight: 700; font-size: 15px;">Player Name</span>
             <span id="selected-board-status-badge" class="badge" style="margin-left: 6px;">7 / 10 HIDDEN</span>
@@ -1137,7 +1142,7 @@
   </div>
 
   <!-- MODULE SCRIPTS -->
-  <script type="module" src="suggestions.js?v=20261109"></script>
-  <script type="module" src="app.js?v=20261109"></script>
+  <script type="module" src="suggestions.js?v=20261109b"></script>
+  <script type="module" src="app.js?v=20261109b"></script>
 </body>
 </html>

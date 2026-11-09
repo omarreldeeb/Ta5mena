@@ -9,7 +9,7 @@ import {
   normalizeText, 
   getLevenshteinDistance, 
   searchSuggestions 
-} from "./suggestions.js?v=20261109";
+} from "./suggestions.js?v=20261109b";
 
 // ============================================================================
 // FIREBASE CONFIGURATION
@@ -639,8 +639,11 @@ class GameController {
     this.turnOrderContainer = document.getElementById("turn-order-container");
     this.gameRoundIndicator = document.getElementById("game-round-indicator");
     this.btnHostSkipTurnBar = document.getElementById("btn-host-skip-turn-bar");
+    this.btnTopHostSkipTurn = document.getElementById("btn-top-host-skip-turn");
     this.activeTurnControl = document.getElementById("active-turn-control");
     this.activeTurnControlTitle = document.getElementById("active-turn-control-title");
+    this.activeTargetNameDisplay = document.getElementById("active-target-name-display");
+    this.turnTagBadge = document.getElementById("turn-tag-badge");
     this.btnActiveSkipTurn = document.getElementById("btn-active-skip-turn");
     this.passiveTurnBanner = document.getElementById("passive-turn-banner");
     this.passiveActivePlayerName = document.getElementById("passive-active-player-name");
@@ -980,9 +983,11 @@ class GameController {
     this.btnHostSkipTurn?.addEventListener("pointerdown", onHostSkip);
     this.btnActiveSkipTurn?.addEventListener("click", onHostSkip);
     this.btnActiveSkipTurn?.addEventListener("pointerdown", onHostSkip);
+    this.btnTopHostSkipTurn?.addEventListener("click", onHostSkip);
+    this.btnTopHostSkipTurn?.addEventListener("pointerdown", onHostSkip);
 
     document.addEventListener("click", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn, #btn-top-host-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -990,7 +995,7 @@ class GameController {
       }
     });
     document.addEventListener("pointerdown", (e) => {
-      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn");
+      const skipTrigger = e.target.closest("#btn-host-skip-turn, #btn-active-skip-turn, #btn-top-host-skip-turn");
       if (skipTrigger) {
         e.preventDefault();
         e.stopPropagation();
@@ -4118,17 +4123,8 @@ class GameController {
     }
     this.gameRoundIndicator.textContent = `ROUND ${game.round || 1}`;
 
-    // Turn Order pills
-    this.turnOrderContainer.innerHTML = "";
-    turnOrder.forEach(pid => {
-      const p = players[pid];
-      if (!p) return;
-      const pill = document.createElement("div");
-      const isActive = (pid === activePlayerId);
-      pill.className = `turn-pill ${isActive ? 'is-active' : ''}`;
-      pill.textContent = p.name + (pid === this.myPlayerId ? ' (You)' : '');
-      this.turnOrderContainer.appendChild(pill);
-    });
+    // Unified Player Bar (Turn Order + Target Selection + Board Tabs in ONE compact bar)
+    this.renderUnifiedPlayerBar(room);
 
     // Check for Active Layer 3 Confirmation Modal
     this.handleConfirmationState(room);
@@ -4192,20 +4188,28 @@ class GameController {
       this.passiveTurnBanner.classList.add("hidden");
       const activeP = players[activePlayerId];
       const activeName = activeP ? activeP.name : "Player";
+      if (this.turnTagBadge) {
+        this.turnTagBadge.textContent = `${activeName.toUpperCase()}'S TURN`;
+      }
       if (this.activeTurnControlTitle) {
         this.activeTurnControlTitle.textContent = `CURRENT TURN: ${activeName.toUpperCase()}`;
       }
       this.btnActiveSkipTurn?.classList.remove("hidden");
+      this.btnTopHostSkipTurn?.classList.remove("hidden");
       if (!isSoleTurn) {
         this.renderTargetPlayerSelector(room);
       }
     } else if (isMyTurn) {
       this.activeTurnControl.classList.remove("hidden");
       this.passiveTurnBanner.classList.add("hidden");
+      if (this.turnTagBadge) {
+        this.turnTagBadge.textContent = "YOUR TURN";
+      }
       if (this.activeTurnControlTitle) {
         this.activeTurnControlTitle.textContent = "YOUR TURN: GUESS AN OPPONENT'S ITEM";
       }
       this.btnActiveSkipTurn?.classList.add("hidden");
+      this.btnTopHostSkipTurn?.classList.toggle("hidden", !this.isHost);
       if (!isSoleTurn) {
         this.renderTargetPlayerSelector(room);
       }
@@ -4215,6 +4219,7 @@ class GameController {
       const activeP = players[activePlayerId];
       this.passiveActivePlayerName.textContent = activeP ? activeP.name : "Player";
       this.btnHostSkipTurn.classList.toggle("hidden", !this.isHost);
+      this.btnTopHostSkipTurn?.classList.toggle("hidden", !this.isHost);
     }
 
     // Opponent tabs bar & Board slots
@@ -4418,6 +4423,8 @@ class GameController {
             this.renderMissedGuesses(this.targetMissedGuessesBox, this.targetMissedGuessesList, missedList);
           }
 
+          this.updateActiveTargetDisplay(p.name);
+          this.renderUnifiedPlayerBar(room);
           this.renderPlayerTabs(room);
           this.renderBoardSlots(room);
           this.updateSubmitButtonState();
@@ -4441,7 +4448,131 @@ class GameController {
     this.updateSubmitButtonState();
   }
 
+  updateActiveTargetDisplay(targetName = "") {
+    if (!targetName && this.selectedTargetId && this.roomData?.players) {
+      targetName = this.roomData.players[this.selectedTargetId]?.name || "";
+    }
+    const displayEl = this.activeTargetNameDisplay || document.getElementById("active-target-name-display");
+    if (displayEl) {
+      displayEl.textContent = targetName || "Select Target";
+    }
+    if (this.inputTurnGuess) {
+      this.inputTurnGuess.placeholder = targetName ? `Guess on ${targetName}'s list...` : "Guess on opponent's list...";
+    }
+  }
+
+  renderUnifiedPlayerBar(room) {
+    if (!this.turnOrderContainer) return;
+    const game = room?.game || {};
+    const players = room?.players || {};
+    const turnOrder = game.turnOrder || [];
+    const activePlayerId = game.activePlayerId || turnOrder[game.currentTurnIndex || 0];
+    const isMyTurn = (this.isLocalMode || activePlayerId === this.myPlayerId);
+    const opponentIds = Object.keys(players).filter(id => id !== this.myPlayerId && !players[id].left);
+    const finishedOrder = room?.finishedOrder
+      ? (Array.isArray(room.finishedOrder) ? room.finishedOrder : Object.values(room.finishedOrder))
+      : [];
+
+    // Auto-select first valid target if none selected or target is completed
+    let activeTargetId = this.selectedTargetId || this.selectedTargetPlayerId;
+    if (isMyTurn) {
+      if (!activeTargetId || !players[activeTargetId] || players[activeTargetId].left || this.isPlayerListCompleted(activeTargetId, room.lists || {})) {
+        activeTargetId = opponentIds.find(id => !this.isPlayerListCompleted(id, room.lists || {})) || null;
+        this.selectedTargetId = activeTargetId;
+        this.selectedTargetPlayerId = activeTargetId;
+      }
+    }
+
+    // Sync lower board view
+    if (!this.isViewingMySecretList && (!this.viewingPlayerId || !players[this.viewingPlayerId] || players[this.viewingPlayerId].left)) {
+      this.viewingPlayerId = activeTargetId || opponentIds[0] || this.myPlayerId;
+    }
+
+    // Update active target name display in Line 1
+    const targetPlayer = activeTargetId ? players[activeTargetId] : null;
+    this.updateActiveTargetDisplay(targetPlayer ? targetPlayer.name : "");
+
+    this.turnOrderContainer.innerHTML = "";
+
+    turnOrder.forEach(pid => {
+      const p = players[pid];
+      if (!p) return;
+      const isCurrentTurn = (pid === activePlayerId);
+      const isMe = (!this.isLocalMode && pid === this.myPlayerId);
+      const finishIndex = finishedOrder.indexOf(pid);
+      const isCompleted = (finishIndex !== -1) || this.isPlayerListCompleted(pid, room.lists || {});
+      const isTargeted = isMyTurn && !isMe && (pid === activeTargetId) && !isCompleted;
+      const isViewing = (!this.isViewingMySecretList && this.viewingPlayerId === pid);
+
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "unified-player-pill" +
+        (isCurrentTurn ? " is-turn" : "") +
+        (isTargeted ? " is-targeted selected active" : "") +
+        (isViewing ? " is-viewing" : "") +
+        (isCompleted ? " is-completed disabled" : "") +
+        (isMe ? " is-me" : "");
+      pill.dataset.playerId = pid;
+
+      let badgeHtml = "";
+      if (isCurrentTurn) {
+        badgeHtml += '<span class="badge badge-accent unified-badge-turn">[TURN]</span>';
+      }
+      if (isTargeted) {
+        badgeHtml += '<span class="badge unified-badge-target">TARGET</span>';
+      } else if (isCompleted) {
+        badgeHtml += '<span class="badge unified-badge-done">DONE</span>';
+      } else if (isViewing && !isCurrentTurn) {
+        badgeHtml += '<span class="badge unified-badge-viewing">VIEWING</span>';
+      }
+
+      const youTag = isMe ? '<span class="unified-you-tag">(You)</span>' : '';
+
+      pill.innerHTML = `
+        <span class="unified-player-name">${this.escapeHtml(p.name)} ${youTag}</span>
+        ${badgeHtml}
+      `;
+
+      pill.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (isMe) {
+          this.viewingPlayerId = this.myPlayerId;
+          this.isViewingMySecretList = true;
+          this.btnToggleMyList?.classList.add("active");
+          this.renderUnifiedPlayerBar(room);
+          this.renderBoardSlots(room);
+          return;
+        }
+
+        this.isViewingMySecretList = false;
+        this.btnToggleMyList?.classList.remove("active");
+        this.viewingPlayerId = pid;
+
+        if (isMyTurn && !isCompleted) {
+          this.selectedTargetId = pid;
+          this.selectedTargetPlayerId = pid;
+          this.updateActiveTargetDisplay(p.name);
+          if (this.inputTurnGuess) {
+            this.inputTurnGuess.placeholder = `Guess on ${p.name}'s list...`;
+            this.inputTurnGuess.focus();
+          }
+          const missedList = p.missedGuesses 
+            ? (Array.isArray(p.missedGuesses) ? p.missedGuesses : Object.values(p.missedGuesses))
+            : [];
+          this.renderMissedGuesses(this.targetMissedGuessesBox, this.targetMissedGuessesList, missedList);
+        }
+
+        this.renderUnifiedPlayerBar(room);
+        this.renderBoardSlots(room);
+        this.updateSubmitButtonState();
+      });
+
+      this.turnOrderContainer.appendChild(pill);
+    });
+  }
+
   renderTurnControls(room) {
+    this.renderUnifiedPlayerBar(room);
     this.renderTargetPlayerSelector(room);
   }
 
@@ -4891,6 +5022,7 @@ class GameController {
       this.viewingPlayerId = opponentIds[0] || this.myPlayerId;
     }
     this.renderPlayerTabs(this.roomData);
+    this.renderUnifiedPlayerBar(this.roomData);
     this.renderBoardSlots(this.roomData);
   }
 
