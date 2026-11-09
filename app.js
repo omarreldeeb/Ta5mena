@@ -9,7 +9,7 @@ import {
   normalizeText, 
   getLevenshteinDistance, 
   searchSuggestions 
-} from "./suggestions.js?v=20261104";
+} from "./suggestions.js?v=20261109";
 
 // ============================================================================
 // FIREBASE CONFIGURATION
@@ -4359,8 +4359,8 @@ class GameController {
       btn.className = `target-btn target-player-btn ${isSelected ? 'selected active' : ''} ${isCompleted ? 'disabled' : ''}`;
       btn.dataset.playerId = id;
 
-      const badgeText = isCompleted ? 'DONE' : (isSelected ? 'SELECTED [ACTIVE]' : 'TARGET');
-      const badgeStyle = isSelected ? 'style="color: #FF4D00; font-weight: 800; font-size: 11px;"' : 'style="font-size: 11px;"';
+      const badgeText = isCompleted ? 'DONE' : (isSelected ? 'SELECTED' : 'TARGET');
+      const badgeStyle = isSelected ? 'style="color: #FF4D00; font-weight: 700; font-size: 10px;"' : 'style="font-size: 10px; font-weight: 700;"';
 
       btn.innerHTML = `
         <span class="target-player-name">${this.escapeHtml(p.name)}</span>
@@ -4388,15 +4388,18 @@ class GameController {
               if (b.classList.contains("disabled")) {
                 badge.textContent = "DONE";
                 badge.style.color = "";
-                badge.style.fontWeight = "";
+                badge.style.fontWeight = "700";
+                badge.style.fontSize = "10px";
               } else if (isThisOne) {
-                badge.textContent = "SELECTED [ACTIVE]";
+                badge.textContent = "SELECTED";
                 badge.style.color = "#FF4D00";
-                badge.style.fontWeight = "800";
+                badge.style.fontWeight = "700";
+                badge.style.fontSize = "10px";
               } else {
                 badge.textContent = "TARGET";
                 badge.style.color = "";
-                badge.style.fontWeight = "";
+                badge.style.fontWeight = "700";
+                badge.style.fontSize = "10px";
               }
             }
           });
